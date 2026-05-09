@@ -741,6 +741,35 @@ struct AppModelSessionListTests {
     }
 
     @Test
+    func completionNotificationHoverCancelsPendingTimedCollapse() {
+        let model = AppModel()
+        model.state = SessionState(
+            sessions: [
+                AgentSession(
+                    id: "session-1",
+                    title: "Test",
+                    tool: .codex,
+                    attachmentState: .attached,
+                    phase: .completed,
+                    summary: "Done",
+                    updatedAt: .now
+                )
+            ]
+        )
+
+        model.notchOpen(reason: .notification, surface: .sessionList(actionableSessionID: "session-1"))
+
+        #expect(model.hasPendingNotificationAutoCollapse)
+
+        model.notePointerInsideIslandSurface()
+
+        #expect(!model.hasPendingNotificationAutoCollapse)
+        #expect(model.shouldDeferTimedNotificationAutoCollapse)
+        #expect(model.notchStatus == .opened)
+        #expect(model.notchOpenReason == .notification)
+    }
+
+    @Test
     func mergeDiscoveredClaudeSessionsPreservesRegistryJumpTargetAndAddsTranscriptMetadata() {
         let now = Date(timeIntervalSince1970: 2_000)
         let model = AppModel()

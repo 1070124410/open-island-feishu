@@ -493,6 +493,13 @@ struct IslandPanelView: View {
                 // Notification mode: NO ScrollView — content sizes naturally
                 sessionListContent(referenceDate: referenceDate)
                     .padding(.vertical, 2)
+                    .onHover { hovering in
+                        if hovering {
+                            model.notePointerInsideIslandSurface()
+                        } else {
+                            model.handlePointerExitedIslandSurface()
+                        }
+                    }
                     .background(
                         GeometryReader { geo in
                             Color.clear.preference(

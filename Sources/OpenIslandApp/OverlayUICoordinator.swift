@@ -54,6 +54,10 @@ final class OverlayUICoordinator {
     @ObservationIgnored
     private var notificationAutoCollapseTask: Task<Void, Never>?
 
+    var hasPendingNotificationAutoCollapse: Bool {
+        notificationAutoCollapseTask != nil
+    }
+
     @ObservationIgnored
     private var autoCollapseSurfaceHasBeenEntered = false
 
@@ -286,6 +290,11 @@ final class OverlayUICoordinator {
 
         isPointerInsideIslandSurface = true
         autoCollapseSurfaceHasBeenEntered = true
+
+        if notchOpenReason == .notification {
+            notificationAutoCollapseTask?.cancel()
+            notificationAutoCollapseTask = nil
+        }
     }
 
     func handlePointerExitedIslandSurface() {
@@ -356,6 +365,11 @@ final class OverlayUICoordinator {
         guard notchStatus == .opened,
               notchOpenReason == .notification,
               islandSurface.autoDismissesWhenPresentedAsNotification(session: activeIslandCardSession) else {
+            return
+        }
+
+        if overlayPanelController.isPointInExpandedArea(NSEvent.mouseLocation) {
+            notePointerInsideIslandSurface()
             return
         }
 
