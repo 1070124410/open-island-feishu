@@ -379,8 +379,21 @@ public final class BridgeServer: @unchecked Sendable {
                 return
             }
 
-            let pendingApproval = pendingApprovals[sessionID]
-            let approvedSummary = pendingApproval?.hookEventName == .permissionRequest
+            guard let pendingApproval = pendingApprovals[sessionID] else {
+                emit(
+                    .actionableStateResolved(
+                        ActionableStateResolved(
+                            sessionID: sessionID,
+                            summary: "Permission request is no longer active.",
+                            timestamp: .now
+                        )
+                    )
+                )
+                send(.response(.acknowledged), to: clientID)
+                return
+            }
+
+            let approvedSummary = pendingApproval.hookEventName == .permissionRequest
                 ? "Permission approved. Codex continued the tool."
                 : "Permission approved. Codex continued the command."
             let deniedSummary: String = {
@@ -2576,6 +2589,15 @@ public final class BridgeServer: @unchecked Sendable {
 
         for sessionID in pendingSessionIDs {
             pendingApprovals.removeValue(forKey: sessionID)
+            emit(
+                .actionableStateResolved(
+                    ActionableStateResolved(
+                        sessionID: sessionID,
+                        summary: "Hook process disconnected.",
+                        timestamp: .now
+                    )
+                )
+            )
         }
 
         let pendingClaudeSessionIDs = pendingClaudeInteractions.compactMap { entry -> String? in

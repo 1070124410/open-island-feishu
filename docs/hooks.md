@@ -311,7 +311,8 @@ Setting `interrupt: true` terminates the current agent turn immediately.
 
 | Source | Event | Timeout |
 |---|---|---|
-| Codex | All events | Bridge default |
+| Codex | `PermissionRequest` | **1 hour** (awaits human approval) |
+| Codex | All other managed events | **45 seconds** |
 | Claude Code | `PermissionRequest` | **24 hours** (awaits human approval) |
 | Claude Code | All other events | **45 seconds** |
 | Gemini CLI | All events | Bridge default |
