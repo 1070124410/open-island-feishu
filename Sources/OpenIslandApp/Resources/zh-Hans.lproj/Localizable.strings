@@ -165,6 +165,7 @@
 /* Settings - About */
 "settings.about.version" = "版本 %@";
 "settings.about.checkForUpdates" = "检查更新…";
+"settings.about.feishuUpdateDisabled" = "飞书定制版不跟随官方自动更新（更新到 v1.1.3 会丢失飞书 Tab）。请使用 ~/open-island 重新打包安装。";
 "settings.about.quitApp" = "退出 Open Island";
 "island.quit.confirmTitle" = "退出 Open Island？";
 "island.quit.confirmAction" = "退出";
@@ -225,3 +226,49 @@
 
 /* Window Titles */
 "window.settings" = "Open Island 设置";
+
+/* Feishu remote approval */
+"settings.tab.feishu" = "飞书";
+"menu.feishuSettings" = "飞书远程审批…";
+"feishu.section.status" = "状态";
+"feishu.section.credentials" = "凭据";
+"feishu.section.behavior" = "行为";
+"feishu.section.automation" = "自动化";
+"feishu.section.hooks" = "IDE Hook";
+"feishu.section.actions" = "操作";
+"feishu.status.title" = "概览";
+"feishu.status.offline" = "无法连接本地飞书插件";
+"feishu.status.noSidecar" = "未安装飞书插件";
+"feishu.status.connected" = "已就绪，可远程审批";
+"feishu.status.pending" = "插件已运行，飞书待连接";
+"feishu.status.unreachable" = "飞书插件未启动";
+"feishu.status.sidecar" = "本地插件";
+"feishu.status.sidecar.up" = "运行中";
+"feishu.status.sidecar.down" = "未运行";
+"feishu.status.feishuLink" = "飞书连接";
+"feishu.status.feishuLink.up" = "已连接";
+"feishu.status.feishuLink.down" = "未连接";
+"feishu.appID" = "App ID (cli_xxx)";
+"feishu.appSecret" = "App Secret";
+"feishu.appSecretPlaceholder" = "请输入 App Secret";
+"feishu.appSecretSaved" = "●●●●●●●●（已保存）";
+"feishu.appSecretSavedHint" = "已保存到本机 Keychain；重新输入并保存可覆盖。";
+"feishu.openID" = "你的 open_id (ou_xxx)";
+"feishu.contact" = "飞书邮箱或手机号";
+"feishu.contactHint" = "用于自动解析 open_id，无需给机器人发消息。需开通 contact:user.id:readonly 权限。";
+"feishu.probeOpenID" = "自动获取 open_id";
+"feishu.saveCredentials" = "保存凭据";
+"feishu.enabled" = "启用飞书推送";
+"feishu.localTimeout" = "本地 UI 优先（秒）";
+"feishu.feishuMaxWait" = "飞书最长等待";
+"feishu.hookTimeout" = "Hook 总超时";
+"feishu.saveBehavior" = "保存行为设置";
+"feishu.installSidecar" = "安装 open-island-feishu sidecar";
+"feishu.injectHooks" = "为 OpenIslandHooks 套上飞书 wrapper";
+"feishu.openPlatformHelp" = "飞书开放平台";
+"feishu.hooksEmpty" = "请先在「安装引导」Tab 安装 Agent Hook。";
+"feishu.sendTest" = "发送测试卡片";
+"feishu.mute" = "暂停飞书（1 小时）";
+"feishu.unmute" = "恢复飞书推送";
+"feishu.refresh" = "刷新状态";
+"feishu.mutedUntil" = "暂停至";

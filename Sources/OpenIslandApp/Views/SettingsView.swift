@@ -6,8 +6,9 @@ import OpenIslandCore
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
-    case setup
-    case display
+ case setup
+ case feishu
+ case display
     case sound
     case appearance
     case watch
@@ -21,6 +22,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:    lang.t("settings.tab.general")
         case .setup:      lang.t("settings.tab.setup")
+        case .feishu:     lang.t("settings.tab.feishu")
         case .appearance: lang.t("settings.tab.appearance")
         case .display:    lang.t("settings.tab.display")
         case .sound:      lang.t("settings.tab.sound")
@@ -35,6 +37,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:    "gearshape.fill"
         case .setup:      "arrow.down.circle.fill"
+        case .feishu:     "bubble.left.and.bubble.right.fill"
         case .appearance: "paintbrush.fill"
         case .display:    "textformat.size"
         case .sound:      "speaker.wave.2.fill"
@@ -49,6 +52,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
         switch self {
         case .general:    .gray
         case .setup:      .orange
+        case .feishu:     .cyan
         case .appearance: .purple
         case .display:    .blue
         case .sound:      .green
@@ -61,7 +65,7 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 
     var section: SettingsSection {
         switch self {
-        case .general, .setup, .display, .sound, .appearance, .watch: .system
+        case .general, .setup, .feishu, .display, .sound, .appearance, .watch: .system
         case .shortcuts, .lab:                                        .advanced
         case .about:                                                  .app
         }
@@ -106,6 +110,13 @@ struct SettingsView: View {
         .onReceive(NotificationCenter.default.publisher(for: .openIslandSelectSetupTab)) { _ in
             selectedTab = .setup
         }
+        .onAppear {
+            if let pending = model.pendingSettingsTabID,
+               let tab = SettingsTab(rawValue: pending) {
+                selectedTab = tab
+                model.pendingSettingsTabID = nil
+            }
+        }
     }
 
     // MARK: Sidebar
@@ -138,9 +149,11 @@ struct SettingsView: View {
             switch selectedTab {
             case .general:
                 GeneralSettingsPane(model: model)
-            case .setup:
-                SetupSettingsPane(model: model)
-            case .appearance:
+        case .setup:
+            SetupSettingsPane(model: model)
+        case .feishu:
+            FeishuSettingsPane(model: model)
+        case .appearance:
                 AppearanceSettingsPane(model: model)
             case .display:
                 DisplaySettingsPane(model: model)
@@ -156,7 +169,9 @@ struct SettingsView: View {
                 AboutSettingsPane(model: model)
             }
 
-            if model.updateChecker.hasUpdate, let version = model.updateChecker.latestVersion {
+            if model.updateChecker.hasUpdate,
+               !model.updateChecker.updatesDisabled,
+               let version = model.updateChecker.latestVersion {
                 UpdateBanner(version: version, lang: lang) {
                     model.updateChecker.checkForUpdates()
                 }
@@ -345,17 +360,23 @@ struct AboutSettingsPane: View {
 
             Form {
                 Section {
-                    aboutActionRow(
-                        title: lang.t("settings.about.checkForUpdates"),
-                        systemImage: "arrow.triangle.2.circlepath",
-                        tint: primaryInk,
-                        action: {
-                            model.updateChecker.checkForUpdates()
-                        }
-                    )
-                    .disabled(!model.updateChecker.canCheckForUpdates)
-                    .opacity(model.updateChecker.canCheckForUpdates ? 1 : 0.55)
-                    .accessibilityIdentifier("settings.about.checkForUpdates")
+                    if model.updateChecker.updatesDisabled {
+                        Text(lang.t("settings.about.feishuUpdateDisabled"))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        aboutActionRow(
+                            title: lang.t("settings.about.checkForUpdates"),
+                            systemImage: "arrow.triangle.2.circlepath",
+                            tint: primaryInk,
+                            action: {
+                                model.updateChecker.checkForUpdates()
+                            }
+                        )
+                        .disabled(!model.updateChecker.canCheckForUpdates)
+                        .opacity(model.updateChecker.canCheckForUpdates ? 1 : 0.55)
+                        .accessibilityIdentifier("settings.about.checkForUpdates")
+                    }
                 }
 
                 Section {

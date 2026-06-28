@@ -42,6 +42,9 @@ final class AppModel {
         let isComplete: Bool
     }
 
+    let feishuSettings = FeishuSettingsModel()
+    var pendingSettingsTabID: String?
+
     let lang = LanguageManager.shared
 
     var state = SessionState() {
@@ -1256,12 +1259,14 @@ final class AppModel {
     }
 
     /// Opens Settings on the Setup tab so the user can install hooks.
-    /// Used by every "Set up agents" CTA in the empty-state UI. A
-    /// dedicated first-run onboarding window will replace this in a
-    /// later PR; until then this is the canonical entry point.
     func showOnboarding() {
         showSettings()
         NotificationCenter.default.post(name: .openIslandSelectSetupTab, object: nil)
+    }
+
+    func showFeishuSettings() {
+        pendingSettingsTabID = SettingsTab.feishu.rawValue
+        showSettings()
     }
 
     func toggleSoundMuted() {

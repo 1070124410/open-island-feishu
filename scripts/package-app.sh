@@ -120,6 +120,16 @@ EOF
 
 plutil -lint "$bundle_dir/Contents/Info.plist" >/dev/null
 
+# 飞书定制版默认禁用 Sparkle 官方源，避免提示升级到 upstream v1.1.3 并覆盖集成。
+if [[ "$version" == *"-feishu"* && -z "${OPEN_ISLAND_APPCAST_URL:-}" ]]; then
+    /usr/libexec/PlistBuddy -c "Delete :SUFeedURL" "$bundle_dir/Contents/Info.plist" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool false" "$bundle_dir/Contents/Info.plist" 2>/dev/null \
+        || /usr/libexec/PlistBuddy -c "Set :SUEnableAutomaticChecks false" "$bundle_dir/Contents/Info.plist"
+    echo "Feishu build: Sparkle upstream feed disabled."
+elif [[ -n "${OPEN_ISLAND_APPCAST_URL:-}" ]]; then
+    /usr/libexec/PlistBuddy -c "Set :SUFeedURL ${OPEN_ISLAND_APPCAST_URL}" "$bundle_dir/Contents/Info.plist"
+fi
+
 # --- Verify bundle structure matches what the app expects at runtime ---
 verify_errors=0
 for required in \
