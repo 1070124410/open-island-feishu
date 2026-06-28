@@ -69,7 +69,7 @@ public struct ClaudeTrackedSessionRecord: Equatable, Codable, Sendable {
 
     public var restorableSession: AgentSession {
         var session = session
-        session.attachmentState = .stale
+        session.applyingRestoredLiveSessionDefaults()
         return session
     }
 

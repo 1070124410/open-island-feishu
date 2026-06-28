@@ -1486,8 +1486,13 @@ public final class BridgeServer: @unchecked Sendable {
     /// conversation, or re-creates it if the previous session was marked as
     /// ended (e.g. after a staleness timeout).
     private func ensureCursorSessionExists(for payload: CursorHookPayload) {
-        if let existing = localState.session(id: payload.sessionID), !existing.isSessionEnded {
-            return
+        if let existing = localState.session(id: payload.sessionID) {
+            if existing.isUserDismissed {
+                return
+            }
+            if !existing.isSessionEnded {
+                return
+            }
         }
 
         emit(

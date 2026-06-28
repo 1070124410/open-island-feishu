@@ -392,6 +392,10 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
     /// Only meaningful for hook-managed sessions.
     public var isSessionEnded: Bool = false
 
+    /// Whether the user manually removed this session from the island list.
+    /// Runtime-only preference; excluded from tracked-session persistence.
+    public var isUserDismissed: Bool = false
+
     /// Whether the agent process is currently alive according to process discovery.
     /// Used for non-hook-managed sessions (e.g. Codex, synthetic Claude sessions).
     public var isProcessAlive: Bool = false
@@ -503,6 +507,24 @@ public struct AgentSession: Equatable, Identifiable, Codable, Sendable {
 }
 
 public extension AgentSession {
+    /// Re-applies hook/liveness flags when rebuilding a session from on-disk
+    /// registry records. Without this, restored live sessions miss
+    /// `isHookManaged` / `isProcessAlive` and stay invisible until the next
+    /// process poll (or forever when startup resolution is stuck).
+    mutating func applyingRestoredLiveSessionDefaults() {
+        attachmentState = .stale
+        guard origin == .live, !isDemoSession else { return }
+
+        isHookManaged = true
+        isSessionEnded = phase == .completed
+        if phase == .completed {
+            isProcessAlive = false
+        } else {
+            isProcessAlive = true
+            processNotSeenCount = 0
+        }
+    }
+
     var isDemoSession: Bool {
         origin == .demo
     }
@@ -523,6 +545,7 @@ public extension AgentSession {
     /// Hook-managed sessions (Claude Code via hooks) rely on hook lifecycle
     /// signals; non-hook sessions use process polling.
     var isVisibleInIsland: Bool {
+        if isUserDismissed { return false }
         if isDemoSession { return true }
         if phase.requiresAttention { return true }
         // Codex.app sessions stay visible while the desktop app is running.

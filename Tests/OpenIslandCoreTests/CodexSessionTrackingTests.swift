@@ -107,6 +107,9 @@ struct CodexSessionTrackingTests {
 
         #expect(record.session.attachmentState == .attached)
         #expect(record.restorableSession.attachmentState == .stale)
+        #expect(record.restorableSession.isHookManaged)
+        #expect(record.restorableSession.isProcessAlive)
+        #expect(record.restorableSession.isVisibleInIsland)
     }
 
     @Test

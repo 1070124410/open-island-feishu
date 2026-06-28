@@ -185,6 +185,12 @@ final class ProcessMonitoringCoordinator {
         // Phase 4: remove sessions that are no longer visible.
         _ = local.removeInvisibleSessions()
 
+        // Hook-managed / process-alive sessions should surface immediately even
+        // when terminal AppleScript probes are unavailable (isAuthoritative=false).
+        if local.sessions.contains(where: \.isVisibleInIsland) {
+            isResolvingInitialLiveSessions = false
+        }
+
         // Single state assignment — triggers didSet exactly once.
         // Compare against the original snapshot to catch all mutations
         // (including liveness and resolver jump targets) and skip the

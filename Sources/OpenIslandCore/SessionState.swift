@@ -56,6 +56,10 @@ public struct SessionState: Equatable, Sendable {
     public mutating func apply(_ event: AgentEvent) {
         switch event {
         case let .sessionStarted(payload):
+            if sessionsByID[payload.sessionID]?.isUserDismissed == true {
+                return
+            }
+
             let preservedFirstSeenAt = sessionsByID[payload.sessionID]?.firstSeenAt
             var session = AgentSession(
                 id: payload.sessionID,
@@ -86,7 +90,7 @@ public struct SessionState: Equatable, Sendable {
             upsert(session)
 
         case let .activityUpdated(payload):
-            guard var session = sessionsByID[payload.sessionID] else {
+            guard var session = sessionsByID[payload.sessionID], !session.isUserDismissed else {
                 return
             }
 
@@ -113,7 +117,7 @@ public struct SessionState: Equatable, Sendable {
             upsert(session)
 
         case let .permissionRequested(payload):
-            guard var session = sessionsByID[payload.sessionID] else {
+            guard var session = sessionsByID[payload.sessionID], !session.isUserDismissed else {
                 return
             }
 
@@ -125,7 +129,7 @@ public struct SessionState: Equatable, Sendable {
             upsert(session)
 
         case let .questionAsked(payload):
-            guard var session = sessionsByID[payload.sessionID] else {
+            guard var session = sessionsByID[payload.sessionID], !session.isUserDismissed else {
                 return
             }
 
@@ -137,7 +141,7 @@ public struct SessionState: Equatable, Sendable {
             upsert(session)
 
         case let .sessionCompleted(payload):
-            guard var session = sessionsByID[payload.sessionID] else {
+            guard var session = sessionsByID[payload.sessionID], !session.isUserDismissed else {
                 return
             }
 
@@ -349,6 +353,10 @@ public struct SessionState: Equatable, Sendable {
         var changed: Set<String> = []
 
         for (id, var session) in sessionsByID {
+            if session.isUserDismissed {
+                continue
+            }
+
             // Remote sessions have no local process — keep them alive as long
             // as the bridge is delivering hook events.
             if session.isRemote {
@@ -429,13 +437,17 @@ public struct SessionState: Equatable, Sendable {
     /// Remove sessions that are no longer visible in the island.
     /// Returns `true` if any sessions were removed.
     @discardableResult
-    /// Manually mark a session as completed and ended.
-    /// Intended for remote sessions whose SSH tunnel dropped without a
-    /// SessionEnd hook.
+    /// Manually remove a session from the island list.
+    /// Used for remote sessions whose SSH tunnel dropped without a SessionEnd
+    /// hook, and for local sessions the user dismisses from the session list.
     public mutating func dismissSession(id: String) {
         guard var session = sessionsByID[id] else { return }
+        session.isUserDismissed = true
         session.isSessionEnded = true
+        session.isProcessAlive = false
         session.phase = .completed
+        session.permissionRequest = nil
+        session.questionPrompt = nil
         session.updatedAt = .now
         upsert(session)
     }

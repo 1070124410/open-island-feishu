@@ -104,6 +104,23 @@ final class OverlayPanelController {
         return OverlayDisplayResolver.diagnostics(preferredScreenID: preferredScreenID, panelSize: panelSize)
     }
 
+    /// Nudge the overlay hosting view so closed-island appearance edits apply immediately.
+    func invalidateContentLayout() {
+        guard let hostingView = panel?.contentView as? NotchHostingView<IslandPanelView> else { return }
+        hostingView.invalidateIntrinsicContentSize()
+        hostingView.needsLayout = true
+        hostingView.layoutSubtreeIfNeeded()
+        hostingView.needsDisplay = true
+    }
+
+    /// Rebuild the overlay SwiftUI root view (fixes stale island chrome after settings edits).
+    func refreshIslandRootView() {
+        guard let model else { return }
+        guard let hostingView = panel?.contentView as? NotchHostingView<IslandPanelView> else { return }
+        hostingView.rootView = IslandPanelView(model: model)
+        invalidateContentLayout()
+    }
+
     // MARK: - Panel creation
 
     private func makePanel(model: AppModel) -> NotchPanel {

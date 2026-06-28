@@ -1,4 +1,6 @@
+import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import OpenIslandCore
 
 /// v6 Personalization tab.
@@ -63,6 +65,8 @@ struct AppearanceSettingsPane: View {
                     note: lang.t("settings.appearance.profile.macbook.note")
                 )
             }
+
+            applyToIslandRow
         }
     }
 
@@ -123,7 +127,14 @@ struct AppearanceSettingsPane: View {
     private var notchPersonalizationPart: some View {
         VStack(alignment: .leading, spacing: 18) {
             partHeader(title: lang.t("settings.appearance.notchPart.title"))
+            if editingProfile != model.activeAppearanceProfile {
+                activeProfileHintBanner
+            }
             previewSection
+            closedLeadingSection
+            if editingPreferences.closedLeading == .pet {
+                customContentSection
+            }
             rightSlotSection
             centerLabelSection
         }
@@ -174,7 +185,7 @@ struct AppearanceSettingsPane: View {
 
             TimelineView(.periodic(from: .now, by: 0.25)) { context in
                 IslandPreviewPill(
-                    mode: previewMode,
+                    leading: previewLeading,
                     label: previewLabel,
                     rightSlot: previewRightContent,
                     layout: previewLayout,
@@ -249,7 +260,350 @@ struct AppearanceSettingsPane: View {
         }
     }
 
-    // MARK: - 01 · Right slot
+    // MARK: - 01 · Left slot
+
+    private var activeProfileHintBanner: some View {
+        let activeTitle = model.activeAppearanceProfile == .notch
+            ? lang.t("settings.appearance.profile.macbook.title")
+            : lang.t("settings.appearance.profile.external.title")
+        return Text(lang.t("settings.appearance.profile.activeHint", activeTitle))
+            .font(.system(size: 11.5, weight: .medium))
+            .foregroundStyle(V6Palette.paper.opacity(0.55))
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.white.opacity(0.04))
+            )
+    }
+
+    @ViewBuilder
+    private var closedLeadingSection: some View {
+        sectionHeader(
+            title: lang.t("settings.appearance.closedLeading.title"),
+            note: lang.t("settings.appearance.closedLeading.note")
+        )
+
+        HStack(spacing: 12) {
+            closedLeadingCard(.activityBars, icon: {
+                UnifiedBars(mode: previewMode, size: 22)
+            }, title: lang.t("settings.appearance.closedLeading.activityBars"))
+            closedLeadingCard(.pet, icon: {
+                IslandPetView(
+                    kind: editingPreferences.petKind,
+                    emoji: editingPreferences.petEmoji,
+                    customImagePath: editingPreferences.petCustomImagePath,
+                    textScrolling: editingPreferences.petTextScrolling,
+                    textVisibleLength: editingPreferences.petTextVisibleLength,
+                    activityMode: previewMode,
+                    size: 22
+                )
+            }, title: lang.t("settings.appearance.closedLeading.pet"))
+            closedLeadingCard(.summary, icon: {
+                Text(previewSummary.compactText(idleText: lang.t("island.closed.summary.idle")))
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(V6Palette.paper.opacity(0.88))
+                    .lineLimit(1)
+            }, title: lang.t("settings.appearance.closedLeading.summary"))
+        }
+    }
+
+    private func closedLeadingCard<Content: View>(
+        _ option: IslandClosedLeading,
+        @ViewBuilder icon: () -> Content,
+        title: String
+    ) -> some View {
+        let selected = editingPreferences.closedLeading == option
+        return Button {
+            model.updateAppearancePreferences(for: editingProfile) { $0.closedLeading = option }
+        } label: {
+            VStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
+                    icon()
+                }
+                .frame(height: 56)
+
+                Text(title)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(selected ? 0.07 : 0.02))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        selected ? V6Palette.paper.opacity(0.9) : Color.white.opacity(0.08),
+                        lineWidth: selected ? 1.5 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Custom content (scout / text / uploaded image)
+
+    @ViewBuilder
+    private var customContentSection: some View {
+        sectionHeader(
+            title: lang.t("settings.appearance.pet.title"),
+            note: lang.t("settings.appearance.pet.note")
+        )
+
+        HStack(spacing: 12) {
+            customKindCard(.scout, title: lang.t("settings.appearance.pet.scout")) {
+                OpenIslandBrandMark(size: 28, tone: .paper)
+            }
+            customKindCard(.emoji, title: lang.t("settings.appearance.pet.text")) {
+                IslandPetView(
+                    kind: .emoji,
+                    emoji: editingPreferences.petEmoji,
+                    customImagePath: editingPreferences.petCustomImagePath,
+                    textScrolling: editingPreferences.petTextScrolling,
+                    textVisibleLength: editingPreferences.petTextVisibleLength,
+                    activityMode: previewMode,
+                    size: 22
+                )
+            }
+            customKindCard(.custom, title: lang.t("settings.appearance.pet.custom")) {
+                IslandPetView(
+                    kind: .custom,
+                    emoji: editingPreferences.petEmoji,
+                    customImagePath: editingPreferences.petCustomImagePath,
+                    activityMode: previewMode,
+                    size: 22
+                )
+            }
+        }
+
+        if editingPreferences.petKind == .emoji {
+            HStack(spacing: 10) {
+                Text(lang.t("settings.appearance.pet.textLabel"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(V6Palette.paper.opacity(0.62))
+                TextField(lang.t("settings.appearance.pet.textPlaceholder"), text: petTextBinding)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 14))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                            .fill(Color.white.opacity(0.06))
+                    )
+                    .frame(
+                        width: IslandPetView.textSlotWidth(
+                            height: 28,
+                            visibleLength: editingPreferences.petTextVisibleLength
+                        )
+                    )
+            }
+
+            HStack(spacing: 12) {
+                Text(lang.t("settings.appearance.pet.textVisibleLength"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(V6Palette.paper.opacity(0.62))
+                Stepper(
+                    value: petTextVisibleLengthBinding,
+                    in: IslandPetView.minTextVisibleLength...IslandPetView.maxTextVisibleLength
+                ) {
+                    Text(lang.t("settings.appearance.pet.textVisibleLengthValue", editingPreferences.petTextVisibleLength))
+                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(V6Palette.paper.opacity(0.78))
+                        .frame(minWidth: 52, alignment: .leading)
+                }
+            }
+
+            Toggle(isOn: petTextScrollBinding) {
+                Text(lang.t("settings.appearance.pet.textScroll"))
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(V6Palette.paper.opacity(0.72))
+            }
+            .toggleStyle(.switch)
+        }
+
+        if editingPreferences.petKind == .custom {
+            HStack(spacing: 10) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(lang.t("settings.appearance.pet.customPath"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(V6Palette.paper.opacity(0.62))
+                    Text(editingPreferences.petCustomImagePath.isEmpty
+                         ? lang.t("settings.appearance.pet.customEmpty")
+                         : editingPreferences.petCustomImagePath)
+                        .font(.system(size: 11, weight: .regular, design: .monospaced))
+                        .foregroundStyle(V6Palette.paper.opacity(0.45))
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                }
+                Spacer(minLength: 8)
+                if !editingPreferences.petCustomImagePath.isEmpty {
+                    Button(lang.t("settings.appearance.pet.customClear")) {
+                        model.updateAppearancePreferences(for: editingProfile) { $0.petCustomImagePath = "" }
+                    }
+                    .font(.system(size: 11.5, weight: .medium))
+                }
+                Button(lang.t("settings.appearance.pet.customChoose")) {
+                    choosePetCustomImage()
+                }
+                .font(.system(size: 11.5, weight: .semibold))
+            }
+        }
+    }
+
+    private func customKindCard<Content: View>(
+        _ kind: IslandPetKind,
+        title: String,
+        @ViewBuilder icon: () -> Content
+    ) -> some View {
+        let selected = editingPreferences.petKind == kind
+        return Button {
+            model.updateAppearancePreferences(for: editingProfile) { prefs in
+                prefs.petKind = kind
+                prefs.closedLeading = .pet
+            }
+        } label: {
+            VStack(spacing: 10) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Color.white.opacity(0.04))
+                    icon()
+                }
+                .frame(height: 56)
+
+                Text(title)
+                    .font(.system(size: 11.5, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.85))
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity)
+            .background(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.white.opacity(selected ? 0.07 : 0.02))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(
+                        selected ? V6Palette.paper.opacity(0.9) : Color.white.opacity(0.08),
+                        lineWidth: selected ? 1.5 : 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var applyToIslandRow: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(lang.t("settings.appearance.apply.title"))
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(V6Palette.paper.opacity(0.82))
+                Text(
+                    editingProfile == model.activeAppearanceProfile
+                        ? lang.t("settings.appearance.apply.hint.active")
+                        : lang.t(
+                            "settings.appearance.apply.hint.inactive",
+                            model.activeAppearanceProfile == .notch
+                                ? lang.t("settings.appearance.profile.macbook.title")
+                                : lang.t("settings.appearance.profile.external.title")
+                        )
+                )
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(V6Palette.paper.opacity(0.45))
+            }
+
+            Spacer(minLength: 8)
+
+            Button(lang.t("settings.appearance.applyToIsland")) {
+                model.refreshIslandAppearancePresentation(for: editingProfile)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.small)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .fill(Color.white.opacity(0.04))
+        )
+    }
+
+    private var petTextVisibleLengthBinding: Binding<Int> {
+        Binding(
+            get: { editingPreferences.petTextVisibleLength },
+            set: { newValue in
+                let clamped = IslandPetView.clampedTextVisibleLength(newValue)
+                let sanitized = IslandPetView.sanitizedPetText(
+                    editingPreferences.petEmoji,
+                    scrollingEnabled: editingPreferences.petTextScrolling,
+                    visibleLength: clamped
+                )
+                model.updateAppearancePreferences(for: editingProfile) { prefs in
+                    prefs.petTextVisibleLength = clamped
+                    prefs.petEmoji = sanitized
+                }
+            }
+        )
+    }
+
+    private var petTextScrollBinding: Binding<Bool> {
+        Binding(
+            get: { editingPreferences.petTextScrolling },
+            set: { enabled in
+                let trimmed = IslandPetView.sanitizedPetText(
+                    editingPreferences.petEmoji,
+                    scrollingEnabled: enabled,
+                    visibleLength: editingPreferences.petTextVisibleLength
+                )
+                model.updateAppearancePreferences(for: editingProfile) { prefs in
+                    prefs.petTextScrolling = enabled
+                    prefs.petEmoji = trimmed
+                    prefs.petKind = .emoji
+                    prefs.closedLeading = .pet
+                }
+            }
+        )
+    }
+
+    private var petTextBinding: Binding<String> {
+        Binding(
+            get: { editingPreferences.petEmoji },
+            set: { newValue in
+                let sanitized = IslandPetView.sanitizedPetText(
+                    newValue,
+                    scrollingEnabled: editingPreferences.petTextScrolling,
+                    visibleLength: editingPreferences.petTextVisibleLength
+                )
+                model.updateAppearancePreferences(for: editingProfile) { prefs in
+                    prefs.petEmoji = sanitized
+                    prefs.petKind = .emoji
+                    prefs.closedLeading = .pet
+                }
+            }
+        )
+    }
+
+    private func choosePetCustomImage() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.png, .jpeg, .gif, .webP, .svg]
+        panel.prompt = lang.t("settings.appearance.pet.customChoose")
+        guard panel.runModal() == .OK, let url = panel.url else { return }
+        model.updateAppearancePreferences(for: editingProfile) { prefs in
+            prefs.petCustomImagePath = url.path
+            prefs.petKind = .custom
+            prefs.closedLeading = .pet
+        }
+    }
+
+    // MARK: - 02 · Right slot
 
     @ViewBuilder
     private var rightSlotSection: some View {
@@ -263,6 +617,18 @@ struct AppearanceSettingsPane: View {
                           title: lang.t("settings.appearance.rightSlot.count"))
             rightSlotCard(.agents, icon: { AgentsMiniGridPreview() },
                           title: lang.t("settings.appearance.rightSlot.agents"))
+            rightSlotCard(.summary, icon: {
+                Text(
+                    previewSummary.rightSlotText(
+                        waitingLabel: lang.t("island.sessionOverview.waiting"),
+                        runningLabel: lang.t("island.sessionOverview.running"),
+                        doneLabel: lang.t("island.sessionOverview.done")
+                    ) ?? "2运行·1完成"
+                )
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(V6Palette.paper.opacity(0.72))
+                    .lineLimit(1)
+            }, title: lang.t("settings.appearance.rightSlot.summary"))
             rightSlotCard(.none,   icon: { Text("—")
                                       .font(.system(size: 14, weight: .semibold, design: .monospaced))
                                       .foregroundStyle(V6Palette.paper.opacity(0.5)) },
@@ -308,7 +674,7 @@ struct AppearanceSettingsPane: View {
         .buttonStyle(.plain)
     }
 
-    // MARK: - 02 · Center label
+    // MARK: - 03 · Center label
 
     @ViewBuilder
     private var centerLabelSection: some View {
@@ -320,6 +686,9 @@ struct AppearanceSettingsPane: View {
         HStack(spacing: 12) {
             centerLabelCard(.agentAction, sample: "Claude · editing")
             centerLabelCard(.sessionName,  sample: "open-island")
+            centerLabelCard(.summary, sample: previewSummary.centerLabelText(
+                idleText: lang.t("island.closed.summary.idle")
+            ))
             centerLabelCard(.off,          sample: "—")
         }
     }
@@ -329,6 +698,7 @@ struct AppearanceSettingsPane: View {
         let title: String = switch option {
         case .agentAction: lang.t("settings.appearance.centerLabel.agentAction")
         case .sessionName: lang.t("settings.appearance.centerLabel.sessionName")
+        case .summary:     lang.t("settings.appearance.centerLabel.summary")
         case .off:         lang.t("settings.appearance.centerLabel.off")
         }
         return Button {
@@ -643,8 +1013,36 @@ struct AppearanceSettingsPane: View {
         case (.waiting, _):            return lang.t("settings.appearance.preview.permissionNeeded")
         case (.running, .agentAction): return lang.t("settings.appearance.preview.agentEditing")
         case (.running, .sessionName): return "open-island"
+        case (.running, .summary):
+            return previewSummary.centerLabelText(idleText: lang.t("island.closed.summary.idle"))
         case (.running, .off):         return nil
         }
+    }
+
+    private var previewLeading: IslandClosedLeadingContent {
+        switch editingPreferences.closedLeading {
+        case .activityBars:
+            return .activityBars(previewMode)
+        case .pet:
+            return .pet(
+                editingPreferences.petKind,
+                emoji: editingPreferences.petEmoji,
+                customImagePath: editingPreferences.petCustomImagePath,
+                textScrolling: editingPreferences.petTextScrolling,
+                textVisibleLength: editingPreferences.petTextVisibleLength,
+                activityMode: previewMode
+            )
+        case .summary:
+            return .summary(previewSummary.compactText(idleText: lang.t("island.closed.summary.idle")))
+        }
+    }
+
+    private var previewSummary: IslandClosedSummary {
+        IslandClosedSummary(
+            taskCount: 3,
+            agentNames: ["Codex", "Claude", "Cursor"],
+            overview: IslandSessionOverviewCounts(total: 3, waiting: 0, running: 2, done: 1, idle: 0)
+        )
     }
 
     private var previewRightContent: IslandRightSlotContent? {
@@ -653,6 +1051,14 @@ struct AppearanceSettingsPane: View {
         case .count: return .count(3)
         case .agents:
             return .agents(previewAgentCells)
+        case .summary:
+            return .summary(
+                previewSummary.rightSlotText(
+                    waitingLabel: lang.t("island.sessionOverview.waiting"),
+                    runningLabel: lang.t("island.sessionOverview.running"),
+                    doneLabel: lang.t("island.sessionOverview.done")
+                ) ?? "2运行·1完成"
+            )
         }
     }
 

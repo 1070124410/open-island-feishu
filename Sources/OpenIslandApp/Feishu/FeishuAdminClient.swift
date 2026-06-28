@@ -96,11 +96,13 @@ enum FeishuAdminClient {
         var state: String
         var openID: String?
         var message: String?
+        var helpURL: String?
 
         enum CodingKeys: String, CodingKey {
             case state
             case openID = "open_id"
             case message
+            case helpURL = "help_url"
         }
     }
 

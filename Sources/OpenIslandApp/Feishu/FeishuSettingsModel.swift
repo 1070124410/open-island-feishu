@@ -23,6 +23,7 @@ final class FeishuSettingsModel {
 
     var probeState = "idle"
     var probeMessage = ""
+    var probeHelpURL = ""
 
     private var probePollTask: Task<Void, Never>?
 
@@ -36,6 +37,57 @@ final class FeishuSettingsModel {
 
     var statusSummary: String {
         status?.message ?? lastError ?? "Configure App ID / Secret / open_id to enable remote approval."
+    }
+
+    func statusTitleCompact(lang: LanguageManager) -> String {
+        guard let status else { return lang.t("feishu.status.offline") }
+        if !status.sidecarInstalled { return lang.t("feishu.status.noSidecar") }
+        if status.feishuConnected { return lang.t("feishu.status.connected") }
+        if status.daemonReachable { return lang.t("feishu.status.pending") }
+        return lang.t("feishu.status.unreachable")
+    }
+
+    /// 新手引导各步是否完成（供 FeishuSetupGuideView 展示进度）。
+    var guideStep1Done: Bool {
+        guard let st = status else { return false }
+        return st.sidecarInstalled && st.daemonReachable
+    }
+
+    var guideStep2Done: Bool {
+        guard let st = status else { return false }
+        return !st.appID.isEmpty && st.hasAppSecret && st.hasOpenID
+    }
+
+    var guideStep3Done: Bool {
+        hooks.contains { $0.state != "absent" }
+    }
+
+    var guideStep4Done: Bool {
+        guard status?.enabled == true else { return false }
+        let active = hooks.filter { $0.state != "absent" }
+        guard !active.isEmpty else { return false }
+        return active.allSatisfy { $0.state == "already_wrapped" }
+    }
+
+    var guideStep5Done: Bool {
+        status?.feishuConnected == true
+    }
+
+    var allGuideStepsDone: Bool {
+        guideStep1Done && guideStep2Done && guideStep3Done && guideStep4Done && guideStep5Done
+    }
+
+    func hookStateLabel(_ state: String, lang: LanguageManager) -> String {
+        switch state {
+        case "already_wrapped":
+            return lang.t("feishu.hookState.wrapped")
+        case "injectable":
+            return lang.t("feishu.hookState.injectable")
+        case "absent":
+            return lang.t("feishu.hookState.absent")
+        default:
+            return state
+        }
     }
 
     func refresh() async {
@@ -136,6 +188,7 @@ final class FeishuSettingsModel {
             defer { isBusy = false }
             probeState = "running"
             probeMessage = "正在通过飞书 API 解析 open_id…"
+            probeHelpURL = ""
             lastError = nil
             do {
                 try await FeishuAdminClient.saveCredentials(.init(
@@ -154,6 +207,7 @@ final class FeishuSettingsModel {
                 )
                 probeState = st.state
                 probeMessage = st.message ?? ""
+                probeHelpURL = st.helpURL ?? ""
                 if st.state == "done", let id = st.openID, !id.isEmpty {
                     draftOpenID = id
                     lastMessage = "已获取 open_id"
@@ -162,6 +216,7 @@ final class FeishuSettingsModel {
                 }
                 if st.state == "error" {
                     lastError = st.message
+                    probeHelpURL = st.helpURL ?? ""
                     return
                 }
                 await pollProbe()
@@ -180,6 +235,7 @@ final class FeishuSettingsModel {
             if let st = try? await FeishuAdminClient.probeStatus() {
                 probeState = st.state
                 probeMessage = st.message ?? ""
+                probeHelpURL = st.helpURL ?? ""
                 if st.state == "done", let id = st.openID, !id.isEmpty {
                     draftOpenID = id
                     lastMessage = "已获取 open_id"
@@ -188,6 +244,7 @@ final class FeishuSettingsModel {
                 }
                 if st.state == "error" {
                     lastError = st.message
+                    probeHelpURL = st.helpURL ?? ""
                     probeMessage = st.message ?? "探测失败"
                     return
                 }

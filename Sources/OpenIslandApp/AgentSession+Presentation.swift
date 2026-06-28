@@ -114,6 +114,31 @@ extension AgentSession {
         jumpTarget?.terminalApp
     }
 
+    /// Terminal badge for session rows — hides native app hosts that duplicate
+    /// the agent tag (e.g. Codex + Codex.app).
+    var spotlightTerminalSideBadge: String? {
+        guard let terminal = spotlightTerminalBadge?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !terminal.isEmpty else {
+            return nil
+        }
+
+        let normalized = terminal.lowercased()
+        switch tool {
+        case .codex:
+            if normalized.contains("codex") { return nil }
+        case .cursor:
+            if normalized.contains("cursor") { return nil }
+        case .geminiCLI:
+            if normalized.contains("gemini") { return nil }
+        case .openCode:
+            if normalized.contains("opencode") { return nil }
+        default:
+            break
+        }
+
+        return terminal
+    }
+
     var spotlightWorkspaceName: String {
         if let workspaceName = jumpTarget?.workspaceName.trimmedForSurface,
            !workspaceName.isEmpty {

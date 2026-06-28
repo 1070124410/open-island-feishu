@@ -1,0 +1,27 @@
+# NOTICE — Third-Party and Upstream Attribution
+
+## Open Island Feishu
+
+Copyright (c) 2026 Rayven (1070124410) and contributors.
+
+This project is a derivative work based on [Open Island / open-vibe-island](https://github.com/Octane0411/open-vibe-island) by Octane0411 and contributors.
+
+## License
+
+**Open Island Feishu** (this repository) is licensed under the **GNU General Public License v3.0**. See [LICENSE](./LICENSE).
+
+## Feishu Sidecar
+
+Remote approval over Feishu is provided by the companion project **[vibe-island-feishu](https://github.com/1070124410/vibe-island-feishu)**, which is licensed under the **MIT License**.
+
+You may install and use the sidecar separately; it communicates with this app over a local HTTP admin API (`127.0.0.1:8742` by default).
+
+## Upstream
+
+When distributing binaries or source derived from this fork, you must:
+
+1. Retain the GPL v3 license and source availability obligations.
+2. Document that your version is based on Open Island / open-vibe-island.
+3. Not imply endorsement by the upstream authors unless permitted.
+
+Upstream homepage: https://github.com/Octane0411/open-vibe-island

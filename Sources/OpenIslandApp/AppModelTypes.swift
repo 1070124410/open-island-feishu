@@ -28,7 +28,27 @@ enum TrackedEventIngress {
 enum IslandRightSlot: String, CaseIterable, Identifiable, Sendable {
     case count   // "×N" badge
     case agents  // colored dot stack, one per active agent tool
+    case summary // compact text: task count + agent names
     case none    // pill collapses — useful if you just want the bars
+
+    var id: String { rawValue }
+}
+
+/// What the closed island renders in the left slot (replacing the default
+/// UnifiedBars glyph when set to custom content or summary).
+enum IslandClosedLeading: String, CaseIterable, Identifiable, Sendable {
+    case activityBars // animated three-bar activity glyph (default)
+    case pet          // scout / text / uploaded image (UI: 自定义)
+    case summary      // compact task + agent summary text
+
+    var id: String { rawValue }
+}
+
+/// Custom left-slot content source (persisted key remains `petKind`).
+enum IslandPetKind: String, CaseIterable, Identifiable, Sendable {
+    case scout  // Open Island brand mark
+    case emoji  // short text or emoji (UI: 文本)
+    case custom // user-selected image file (UI: 自己上传的图片)
 
     var id: String { rawValue }
 }
@@ -39,6 +59,7 @@ enum IslandRightSlot: String, CaseIterable, Identifiable, Sendable {
 enum IslandCenterLabel: String, CaseIterable, Identifiable, Sendable {
     case sessionName  // e.g. "open-island"
     case agentAction  // e.g. "Claude · editing"
+    case summary      // e.g. "3 tasks · Codex, Claude"
     case off
 
     var id: String { rawValue }
@@ -54,11 +75,18 @@ enum IslandAppearanceDisplayProfile: String, CaseIterable, Identifiable, Sendabl
 }
 
 struct IslandAppearancePreferences: Equatable, Sendable {
+    var closedLeading: IslandClosedLeading = .activityBars
+    var petKind: IslandPetKind = .scout
+    var petEmoji: String = "🐾"
+    var petTextScrolling: Bool = false
+    /// Visible character slots for the custom text field on the closed island (2…12).
+    var petTextVisibleLength: Int = 5
+    var petCustomImagePath: String = ""
     var rightSlot: IslandRightSlot = .count
     var centerLabel: IslandCenterLabel = .agentAction
     var usageDisplay: IslandUsageDisplay = .compact
     var sessionStateIndicator: IslandSessionStateIndicator = .animatedDot
-    var sessionGroup: IslandSessionGroup = .none
+    var sessionGroup: IslandSessionGroup = .agent
     var sessionSort: IslandSessionSort = .attention
     var completedStaleThreshold: IslandCompletedStaleThreshold = .fiveMinutes
 }

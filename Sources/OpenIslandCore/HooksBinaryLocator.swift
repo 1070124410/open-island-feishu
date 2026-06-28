@@ -69,10 +69,7 @@ public enum ManagedHooksBinary {
     }
 
     private static func installDirectory(fileManager: FileManager) -> URL {
-        fileManager.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library", isDirectory: true)
-            .appendingPathComponent("Application Support", isDirectory: true)
-            .appendingPathComponent("OpenIsland", isDirectory: true)
+        OpenIslandPaths.applicationSupportURL(fileManager: fileManager)
             .appendingPathComponent("bin", isDirectory: true)
     }
 

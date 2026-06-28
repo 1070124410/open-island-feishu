@@ -10,10 +10,13 @@ import Sparkle
 @MainActor
 @Observable
 final class UpdateChecker: NSObject {
-    static let releasesURL = URL(string: "https://github.com/Octane0411/open-vibe-island/releases")!
+    static let releasesURL = URL(string: "https://github.com/1070124410/open-island-feishu/releases")!
 
-    /// 飞书定制版（版本号含 `-feishu`）不应走官方 Sparkle 更新，否则会覆盖集成。
+    /// This fork ships as **Open Island Feishu** with bundle id `app.openisland.feishu`.
     static var isFeishuIntegrationBuild: Bool {
+        if Bundle.main.bundleIdentifier == "app.openisland.feishu" {
+            return true
+        }
         guard let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String else {
             return false
         }

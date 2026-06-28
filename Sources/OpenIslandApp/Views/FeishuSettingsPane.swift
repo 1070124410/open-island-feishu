@@ -8,6 +8,14 @@ struct FeishuSettingsPane: View {
 
     var body: some View {
         Form {
+            FeishuSetupGuideView(
+                lang: lang,
+                feishu: feishu,
+                onOpenSetup: { model.showOnboarding() },
+                onInstallSidecar: { Task { await feishu.installSidecarIfNeeded() } },
+                onInjectHooks: { Task { await feishu.injectAllHooks() } },
+                onSendTest: { Task { await feishu.sendTestCard() } }
+            )
             statusSection
             credentialsSection
             behaviorSection
@@ -25,9 +33,11 @@ struct FeishuSettingsPane: View {
         Section(lang.t("feishu.section.status")) {
             LabeledContent(lang.t("feishu.status.title"), value: statusHeadline)
             if let msg = feishu.lastError ?? feishu.status?.message, !msg.isEmpty {
-                Text(msg)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                feishuMessageView(
+                    message: msg,
+                    helpURL: feishu.probeHelpURL,
+                    style: .error
+                )
             } else if !feishu.lastMessage.isEmpty {
                 Text(feishu.lastMessage)
                     .font(.caption)
@@ -97,9 +107,11 @@ struct FeishuSettingsPane: View {
                 }
             }
             if !feishu.probeMessage.isEmpty {
-                Text(feishu.probeMessage)
-                    .font(.caption)
-                    .foregroundStyle(feishu.probeState == "error" ? .red : .secondary)
+                feishuMessageView(
+                    message: feishu.probeMessage,
+                    helpURL: feishu.probeHelpURL,
+                    style: feishu.probeState == "error" ? .error : .secondary
+                )
             }
             Button(lang.t("feishu.saveCredentials")) {
                 Task { await feishu.saveCredentials() }
@@ -108,7 +120,43 @@ struct FeishuSettingsPane: View {
         }
     }
 
-    /// App Secret 已保存且未在编辑时，在输入框内显示占位提示。
+    @ViewBuilder
+    private func feishuMessageView(
+        message: String,
+        helpURL: String,
+        style: FeishuActionableMessageView.Style
+    ) -> some View {
+        let presentation = resolvedMessage(message: message, helpURL: helpURL)
+        if presentation.actionURL != nil {
+            FeishuActionableMessageView(
+                presentation: presentation,
+                style: style,
+                copyLabel: lang.t("feishu.copyLink"),
+                openLabel: lang.t("feishu.openLink")
+            )
+        } else {
+            Text(presentation.summary)
+                .font(.caption)
+                .foregroundStyle(style == .error ? .red : .secondary)
+        }
+    }
+
+    private func resolvedMessage(message: String, helpURL: String) -> FeishuDisplayedMessage {
+        var presentation = FeishuDisplayedMessage.parse(
+            message: message,
+            helpURL: helpURL.isEmpty ? nil : helpURL,
+            appID: feishu.draftAppID
+        )
+        if isContactScopeError(message) {
+            presentation.summary = lang.t("feishu.error.contactScopeSummary")
+        }
+        return presentation
+    }
+
+    private func isContactScopeError(_ message: String) -> Bool {
+        message.localizedCaseInsensitiveContains("contact:user.id:readonly") || message.contains("99991672")
+    }
+
     private var appSecretPrompt: String {
         if !feishu.draftAppSecret.isEmpty { return lang.t("feishu.appSecretPlaceholder") }
         if feishu.status?.hasAppSecret == true { return lang.t("feishu.appSecretSaved") }
@@ -172,7 +220,7 @@ struct FeishuSettingsPane: View {
                     HStack {
                         Text(hook.source)
                         Spacer()
-                        Text(hook.state)
+                        Text(feishu.hookStateLabel(hook.state, lang: lang))
                             .font(.caption)
                             .foregroundStyle(hook.state == "already_wrapped" ? .green : .orange)
                     }

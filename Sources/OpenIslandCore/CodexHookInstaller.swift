@@ -81,7 +81,7 @@ public enum CodexHookInstaller {
     // The bridge still understands richer hook events, but we do not install them by default
     // because per-command Bash hooks produce a large amount of terminal log spam.
     private static let eventSpecs: [(name: String, matcher: String?, timeout: Int)] = [
-        ("SessionStart", "startup|resume", managedTimeout),
+        ("SessionStart", nil, managedTimeout),
         ("UserPromptSubmit", nil, managedTimeout),
         ("PermissionRequest", nil, managedInteractiveTimeout),
         ("Stop", nil, managedTimeout),

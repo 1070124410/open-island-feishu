@@ -274,7 +274,7 @@ struct IslandPanelView: View {
         let layout: V6ClosedLayout = isExternalDisplayPlacement ? .external : .macbook
         let physicalNotchWidth: CGFloat = targetOverlayScreen?.notchSize.width ?? 180
         V6ClosedPill(
-            mode: model.islandClosedMode,
+            leading: model.islandClosedLeadingContent(),
             label: layout == .external ? model.islandClosedLabel() : nil,
             rightSlot: model.islandClosedRightSlotContent(),
             layout: layout,
@@ -282,6 +282,7 @@ struct IslandPanelView: View {
             physicalNotchWidth: layout == .macbook ? physicalNotchWidth : 0,
             minWidth: 70
         )
+        .id("\(model.appearancePreferencesRevision)-\(model.activeAppearanceProfile.rawValue)")
         .scaleEffect(isPopping ? 1.04 : 1, anchor: .top)
         .animation(popAnimation, value: isPopping)
     }
@@ -338,32 +339,24 @@ struct IslandPanelView: View {
     private var openedHeaderContent: some View {
         if usesNotchAwareOpenedHeader {
             GeometryReader { geometry in
-                let providers = openedUsageProviders
-                let providerGroups = splitUsageProviders(providers)
                 let metrics = openedHeaderMetrics(for: geometry.size.width)
 
                 HStack(spacing: 0) {
-                    usageLaneView(providerGroups.left, alignment: .leading)
+                    openedHeaderPersonalizationCluster(showUsageSummary: false)
                         .frame(width: metrics.leftUsageWidth, alignment: .leading)
 
                     Color.clear
                         .frame(width: metrics.centerGapWidth)
 
-                    HStack(spacing: Self.headerControlSpacing) {
-                        if metrics.rightUsageWidth > 0, !providerGroups.right.isEmpty {
-                            usageLaneView(providerGroups.right, alignment: .trailing)
-                                .frame(width: metrics.rightUsageWidth, alignment: .trailing)
-                        }
-                        openedHeaderButtons
-                    }
-                    .frame(width: metrics.rightLaneWidth, alignment: .trailing)
+                    openedHeaderButtons
+                        .frame(width: metrics.rightLaneWidth, alignment: .trailing)
                 }
                 .padding(.horizontal, openedHeaderHorizontalPadding)
                 .padding(.top, Self.headerTopPadding)
             }
         } else {
-            HStack(spacing: 12) {
-                openedUsageSummary
+            HStack(spacing: 10) {
+                openedHeaderPersonalizationCluster(showUsageSummary: false)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 openedHeaderButtons
@@ -372,6 +365,48 @@ struct IslandPanelView: View {
             .padding(.trailing, openedHeaderHorizontalPadding)
             .padding(.top, Self.headerTopPadding)
         }
+    }
+
+    @ViewBuilder
+    private func openedHeaderPersonalizationCluster(showUsageSummary: Bool = false) -> some View {
+        let prefs = model.appearancePreferences(for: model.activeAppearanceProfile)
+
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            HStack(spacing: 8) {
+                switch prefs.closedLeading {
+                case .activityBars:
+                    UnifiedBars(mode: model.islandClosedMode, size: 18)
+                        .frame(width: 18, height: 18)
+                case .pet:
+                    IslandPetView(
+                        kind: prefs.petKind,
+                        emoji: prefs.petEmoji,
+                        customImagePath: prefs.petCustomImagePath,
+                        textScrolling: prefs.petTextScrolling,
+                        textVisibleLength: prefs.petTextVisibleLength,
+                        activityMode: model.islandClosedMode,
+                        size: 18
+                    )
+                case .summary:
+                    EmptyView()
+                }
+
+                if let breakdown = model.islandClosedTaskBreakdownText(
+                    compact: true,
+                    at: context.date
+                ) {
+                    Text(breakdown)
+                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(V6Palette.paper.opacity(0.72))
+                        .lineLimit(1)
+                } else if prefs.closedLeading == .summary {
+                    Text(lang.t("island.closed.summary.idle"))
+                        .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(V6Palette.paper.opacity(0.45))
+                }
+            }
+        }
+        .id("\(model.appearancePreferencesRevision)-\(model.activeAppearanceProfile.rawValue)-opened-leading")
     }
 
     private var openedHeaderButtons: some View {
@@ -383,7 +418,11 @@ struct IslandPanelView: View {
                 model.toggleSoundMuted()
             }
 
-            headerIconButton(systemName: "gearshape.fill", tint: .white.opacity(0.62)) {
+            headerIconButton(
+                systemName: "gearshape.fill",
+                tint: .white.opacity(0.62),
+                accessibilityLabel: lang.t("menu.settings")
+            ) {
                 model.showSettings()
             }
 
@@ -633,7 +672,7 @@ struct IslandPanelView: View {
                                 onReply: TerminalTextSender.canReply(to: session, enabled: model.completionReplyEnabled)
                                     ? { model.replyToSession(session, text: $0) } : nil,
                                 onJump: { model.jumpToSession(session) },
-                                onDismiss: session.isRemote ? { model.dismissSession(session.id) } : nil
+                                onDismiss: session.isDemoSession ? nil : { model.dismissSession(session.id) }
                             )
                         }
                     }
@@ -683,7 +722,7 @@ struct IslandPanelView: View {
                         onReply: TerminalTextSender.canReply(to: session, enabled: model.completionReplyEnabled)
                             ? { model.replyToSession(session, text: $0) } : nil,
                         onJump: { model.jumpToSession(session) },
-                        onDismiss: session.isRemote ? { model.dismissSession(session.id) } : nil
+                        onDismiss: session.isDemoSession ? nil : { model.dismissSession(session.id) }
                     )
                 }
             }
@@ -727,37 +766,16 @@ struct IslandPanelView: View {
     }
 
     private func sessionOverviewItems(referenceDate: Date) -> [SessionOverviewItem] {
-        let sessions = model.islandListSessions
-        guard !sessions.isEmpty else { return [] }
-
-        let threshold = model.completedStaleThreshold.seconds
-        let waiting = sessions.filter(\.phase.requiresAttention).count
-        let running = sessions.filter { $0.phase == .running }.count
-        let done = sessions.filter {
-            $0.phase == .completed
-                && !isIdleSessionOverviewItem($0, referenceDate: referenceDate, threshold: threshold)
-        }.count
-        let idle = sessions.filter {
-            isIdleSessionOverviewItem($0, referenceDate: referenceDate, threshold: threshold)
-        }.count
+        let counts = model.islandSessionOverviewCounts(at: referenceDate)
+        guard counts.total > 0 else { return [] }
 
         return [
-            SessionOverviewItem(id: "total", title: lang.t("island.sessionOverview.total"), compactTitle: "", count: sessions.count, tint: nil),
-            SessionOverviewItem(id: "waiting", title: lang.t("island.sessionOverview.waiting"), compactTitle: lang.t("island.sessionOverview.waitingCompact"), count: waiting, tint: IslandDesignPalette.Status.waitingAggregate),
-            SessionOverviewItem(id: "running", title: lang.t("island.sessionOverview.running"), compactTitle: lang.t("island.sessionOverview.runningCompact"), count: running, tint: IslandDesignPalette.Status.running),
-            SessionOverviewItem(id: "done", title: lang.t("island.sessionOverview.done"), compactTitle: lang.t("island.sessionOverview.done"), count: done, tint: IslandDesignPalette.Status.completed),
-            SessionOverviewItem(id: "idle", title: lang.t("island.sessionOverview.idle"), compactTitle: lang.t("island.sessionOverview.idle"), count: idle, tint: IslandDesignPalette.Status.idle),
+            SessionOverviewItem(id: "total", title: lang.t("island.sessionOverview.total"), compactTitle: "", count: counts.total, tint: nil),
+            SessionOverviewItem(id: "waiting", title: lang.t("island.sessionOverview.waiting"), compactTitle: lang.t("island.sessionOverview.waitingCompact"), count: counts.waiting, tint: IslandDesignPalette.Status.waitingAggregate),
+            SessionOverviewItem(id: "running", title: lang.t("island.sessionOverview.running"), compactTitle: lang.t("island.sessionOverview.runningCompact"), count: counts.running, tint: IslandDesignPalette.Status.running),
+            SessionOverviewItem(id: "done", title: lang.t("island.sessionOverview.done"), compactTitle: lang.t("island.sessionOverview.done"), count: counts.done, tint: IslandDesignPalette.Status.completed),
+            SessionOverviewItem(id: "idle", title: lang.t("island.sessionOverview.idle"), compactTitle: lang.t("island.sessionOverview.idle"), count: counts.idle, tint: IslandDesignPalette.Status.idle),
         ].filter { $0.id == "total" || $0.count > 0 }
-    }
-
-    private func isIdleSessionOverviewItem(
-        _ session: AgentSession,
-        referenceDate: Date,
-        threshold: TimeInterval
-    ) -> Bool {
-        guard session.phase == .completed else { return false }
-        return session.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
-            || session.islandPresence(at: referenceDate) == .inactive
     }
 
     private func sessionOverviewView(_ items: [SessionOverviewItem], compact: Bool) -> some View {
@@ -804,6 +822,11 @@ struct IslandPanelView: View {
             Text("\(section.sessions.count)")
                 .font(.system(size: 10.5, weight: .medium, design: .monospaced))
                 .foregroundStyle(V6Palette.paper.opacity(0.4))
+
+            if let usage = sectionUsagePresentation(for: section) {
+                compactUsageChip(usage, usesShortTitle: false)
+            }
+
             Spacer(minLength: 0)
         }
         .padding(.leading, sessionListSideInset)
@@ -816,6 +839,21 @@ struct IslandPanelView: View {
                 .fill(.white.opacity(0.055))
                 .frame(height: 1)
         }
+    }
+
+    private func agentTool(for section: IslandSessionSection) -> AgentTool? {
+        guard section.id.hasPrefix("agent-") else { return nil }
+        let rawValue = String(section.id.dropFirst("agent-".count))
+        return AgentTool(rawValue: rawValue)
+    }
+
+    private func sectionUsagePresentation(for section: IslandSessionSection) -> UsageProviderPresentation? {
+        guard model.islandUsageDisplay == .compact,
+              model.islandSessionGroup == .agent,
+              let tool = agentTool(for: section) else {
+            return nil
+        }
+        return model.usageProvider(for: tool)
     }
 
     private func sectionTint(for section: IslandSessionSection) -> Color {
@@ -844,126 +882,6 @@ struct IslandPanelView: View {
 
     // MARK: - Helpers
 
-    @ViewBuilder
-    private var openedUsageSummary: some View {
-        let providers = openedUsageProviders
-
-        if providers.isEmpty == false {
-            ViewThatFits(in: .horizontal) {
-                compactUsageSummaryView(providers, usesShortTitles: false)
-                compactUsageSummaryView(providers, usesShortTitles: true)
-            }
-        } else {
-            Color.clear
-        }
-    }
-
-    private var openedUsageProviders: [UsageProviderPresentation] {
-        guard model.islandUsageDisplay == .compact else {
-            return []
-        }
-
-        var providers: [UsageProviderPresentation] = []
-
-        if let snapshot = model.claudeUsageSnapshot,
-           snapshot.isEmpty == false {
-            var windows: [UsageWindowPresentation] = []
-
-            if let fiveHour = snapshot.fiveHour {
-                windows.append(
-                    UsageWindowPresentation(
-                        id: "claude-5h",
-                        label: "5h",
-                        usedPercentage: fiveHour.usedPercentage,
-                        resetsAt: fiveHour.resetsAt
-                    )
-                )
-            }
-
-            if let sevenDay = snapshot.sevenDay {
-                windows.append(
-                    UsageWindowPresentation(
-                        id: "claude-7d",
-                        label: "7d",
-                        usedPercentage: sevenDay.usedPercentage,
-                        resetsAt: sevenDay.resetsAt
-                    )
-                )
-            }
-
-            if windows.isEmpty == false {
-                providers.append(
-                    UsageProviderPresentation(
-                        id: "claude",
-                        title: "Claude",
-                        windows: windows
-                    )
-                )
-            }
-        }
-
-        if model.showCodexUsage,
-           let snapshot = model.codexUsageSnapshot,
-           snapshot.isEmpty == false {
-            let windows = snapshot.windows.map { window in
-                UsageWindowPresentation(
-                    id: "codex-\(window.key)",
-                    label: window.label,
-                    usedPercentage: window.usedPercentage,
-                    resetsAt: window.resetsAt
-                )
-            }
-
-            if windows.isEmpty == false {
-                providers.append(
-                    UsageProviderPresentation(
-                        id: "codex",
-                        title: "Codex",
-                        windows: windows
-                    )
-                )
-            }
-        }
-
-        return providers
-    }
-
-    private func splitUsageProviders(
-        _ providers: [UsageProviderPresentation]
-    ) -> (left: [UsageProviderPresentation], right: [UsageProviderPresentation]) {
-        switch providers.count {
-        case 0:
-            return ([], [])
-        case 1:
-            return ([providers[0]], [])
-        case 2:
-            return ([providers[0]], [providers[1]])
-        default:
-            let splitIndex = Int(ceil(Double(providers.count) / 2.0))
-            return (
-                Array(providers.prefix(splitIndex)),
-                Array(providers.dropFirst(splitIndex))
-            )
-        }
-    }
-
-    @ViewBuilder
-    private func usageLaneView(
-        _ providers: [UsageProviderPresentation],
-        alignment: Alignment
-    ) -> some View {
-        if providers.isEmpty {
-            Color.clear
-                .frame(maxWidth: .infinity)
-        } else {
-            ViewThatFits(in: .horizontal) {
-                compactUsageSummaryView(providers, usesShortTitles: false)
-                compactUsageSummaryView(providers, usesShortTitles: true)
-            }
-            .frame(maxWidth: .infinity, alignment: alignment)
-        }
-    }
-
     private func openedHeaderMetrics(for totalWidth: CGFloat) -> OpenedHeaderMetrics {
         let horizontalPadding = openedHeaderHorizontalPadding
         let contentWidth = max(0, totalWidth - (horizontalPadding * 2))
@@ -974,7 +892,7 @@ struct IslandPanelView: View {
             return OpenedHeaderMetrics(
                 leftUsageWidth: leftUsageWidth,
                 centerGapWidth: 0,
-                rightUsageWidth: max(0, rightLaneWidth - openedHeaderButtonsWidth - Self.headerControlSpacing),
+                rightUsageWidth: 0,
                 rightLaneWidth: rightLaneWidth
             )
         }
@@ -995,24 +913,13 @@ struct IslandPanelView: View {
 
         let leftUsageWidth = max(0, rawLeftWidth - Self.notchLaneSafetyInset)
         let rightAvailableWidth = max(0, rawRightWidth - Self.notchLaneSafetyInset)
-        let proposedRightUsageWidth = max(
-            0,
-            rightAvailableWidth - openedHeaderButtonsWidth - Self.headerControlSpacing
-        )
-        let rightUsageWidth = proposedRightUsageWidth >= Self.minimumRightUsageLaneWidth
-            ? proposedRightUsageWidth
-            : 0
-        let rightLaneWidth = min(
-            contentWidth,
-            openedHeaderButtonsWidth
-                + (rightUsageWidth > 0 ? Self.headerControlSpacing + rightUsageWidth : 0)
-        )
+        let rightLaneWidth = min(contentWidth, max(openedHeaderButtonsWidth, rightAvailableWidth))
         let centerGapWidth = max(0, contentWidth - leftUsageWidth - rightLaneWidth)
 
         return OpenedHeaderMetrics(
             leftUsageWidth: leftUsageWidth,
             centerGapWidth: centerGapWidth,
-            rightUsageWidth: rightUsageWidth,
+            rightUsageWidth: 0,
             rightLaneWidth: rightLaneWidth
         )
     }
@@ -1045,13 +952,21 @@ struct IslandPanelView: View {
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundStyle(.white.opacity(0.74))
 
-            Text(provider.peakWindowLabel)
-                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
-                .foregroundStyle(.white.opacity(0.42))
+            if let planLabel = provider.planLabel {
+                Text(planLabel)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(.white.opacity(0.48))
+            }
 
-            Text("\(provider.peakUsagePercentage)%")
-                .font(.system(size: 11.5, weight: .bold, design: .monospaced))
-                .foregroundStyle(usageColor(for: provider.peakUsedPercentage))
+            if let peak = provider.peakWindow {
+                Text(peak.label)
+                    .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(.white.opacity(0.42))
+
+                Text("\(peak.roundedUsedPercentage)%")
+                    .font(.system(size: 11.5, weight: .bold, design: .monospaced))
+                    .foregroundStyle(usageColor(for: peak.usedPercentage))
+            }
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
@@ -1064,15 +979,19 @@ struct IslandPanelView: View {
     }
 
     private func usageHelpText(for provider: UsageProviderPresentation) -> String {
-        provider.windows.map { window in
-            var parts = ["\(window.label) \(window.roundedUsedPercentage)%"]
+        var parts: [String] = []
+        if let planLabel = provider.planLabel {
+            parts.append(planLabel)
+        }
+        parts.append(contentsOf: provider.windows.map { window in
+            var lineParts = ["\(window.label) \(window.roundedUsedPercentage)%"]
             if let resetsAt = window.resetsAt,
                let remaining = remainingDurationString(until: resetsAt) {
-                parts.append(remaining)
+                lineParts.append(remaining)
             }
-            return parts.joined(separator: " ")
-        }
-        .joined(separator: " · ")
+            return lineParts.joined(separator: " ")
+        })
+        return parts.isEmpty ? provider.title : parts.joined(separator: " · ")
     }
 
     private func headerPill(_ title: String, tint: Color) -> some View {
@@ -1116,52 +1035,6 @@ struct IslandPanelView: View {
         }
 
         return formatter.string(from: interval)
-    }
-}
-
-private struct UsageProviderPresentation: Identifiable {
-    let id: String
-    let title: String
-    let windows: [UsageWindowPresentation]
-
-    var peakWindow: UsageWindowPresentation? {
-        windows.max { lhs, rhs in
-            lhs.usedPercentage < rhs.usedPercentage
-        }
-    }
-
-    var peakWindowLabel: String {
-        peakWindow?.label ?? ""
-    }
-
-    var peakUsedPercentage: Double {
-        peakWindow?.usedPercentage ?? 0
-    }
-
-    var peakUsagePercentage: Int {
-        peakWindow?.roundedUsedPercentage ?? 0
-    }
-
-    var shortTitle: String {
-        switch id {
-        case "claude":
-            "Cl"
-        case "codex":
-            "Cx"
-        default:
-            String(title.prefix(2))
-        }
-    }
-}
-
-private struct UsageWindowPresentation: Identifiable {
-    let id: String
-    let label: String
-    let usedPercentage: Double
-    let resetsAt: Date?
-
-    var roundedUsedPercentage: Int {
-        Int(usedPercentage.rounded())
     }
 }
 
@@ -1299,7 +1172,7 @@ private struct IslandSessionRow: View {
                 if session.isRemote {
                     sideBadge("SSH")
                 }
-                if let terminalBadge = session.spotlightTerminalBadge {
+                if let terminalBadge = session.spotlightTerminalSideBadge {
                     sideBadge(terminalBadge)
                 }
                 Text(session.spotlightAgeBadge)
@@ -1308,7 +1181,10 @@ private struct IslandSessionRow: View {
                     .frame(minWidth: 30, alignment: .trailing)
                 detailToggleButton(isOpen: showsDetail)
                 if let onDismiss {
-                    DismissButton(action: onDismiss)
+                    DismissButton(
+                        action: onDismiss,
+                        accessibilityLabel: lang.t("island.session.dismiss")
+                    )
                 }
             }
         }
@@ -2716,6 +2592,7 @@ extension MarkdownUI.Theme {
 
 private struct DismissButton: View {
     let action: () -> Void
+    var accessibilityLabel: String = "Remove session"
     @State private var isHovered = false
 
     var body: some View {
@@ -2725,6 +2602,7 @@ private struct DismissButton: View {
                 .foregroundStyle(.white.opacity(isHovered ? 0.8 : 0.4))
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
         .onHover { isHovered = $0 }
     }
 }

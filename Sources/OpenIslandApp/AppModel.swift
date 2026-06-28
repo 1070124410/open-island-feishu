@@ -17,6 +17,7 @@ extension Notification.Name {
 final class AppModel {
     private static let soundMutedDefaultsKey = "overlay.sound.muted"
     private static let showDockIconDefaultsKey = "app.showDockIcon"
+    private static let feishuDockIconMigrationKey = "app.feishuDockIconMigration.v1"
     private static let hapticFeedbackEnabledDefaultsKey = "app.hapticFeedbackEnabled"
     private static let islandRightSlotDefaultsKey = "appearance.island.v6.rightSlot"
     private static let islandCenterLabelDefaultsKey = "appearance.island.v6.centerLabel"
@@ -326,7 +327,8 @@ final class AppModel {
         didSet {
             guard notchAppearancePreferences != oldValue else { return }
             persistAppearancePreferences(notchAppearancePreferences, for: .notch)
-            if activeAppearanceProfile == .notch { appearancePreferencesDidChange(oldValue: oldValue, newValue: notchAppearancePreferences) }
+            appearancePreferencesRevision &+= 1
+            appearancePreferencesDidChange(oldValue: oldValue, newValue: notchAppearancePreferences)
         }
     }
 
@@ -334,9 +336,14 @@ final class AppModel {
         didSet {
             guard topBarAppearancePreferences != oldValue else { return }
             persistAppearancePreferences(topBarAppearancePreferences, for: .topBar)
-            if activeAppearanceProfile == .topBar { appearancePreferencesDidChange(oldValue: oldValue, newValue: topBarAppearancePreferences) }
+            appearancePreferencesRevision &+= 1
+            appearancePreferencesDidChange(oldValue: oldValue, newValue: topBarAppearancePreferences)
         }
     }
+
+    /// Bumped whenever either appearance profile changes so overlay views
+    /// reliably refresh closed/open chrome preferences.
+    private(set) var appearancePreferencesRevision = 0
 
     /// Runtime profile selected from current overlay placement. External
     /// displays use the top-bar presentation; built-in notch displays keep
@@ -386,6 +393,9 @@ final class AppModel {
     @ObservationIgnored
     private var hasFinishedInit = false
 
+    @ObservationIgnored
+    private var screenParametersObserver: Any?
+
     func appearancePreferences(for profile: IslandAppearanceDisplayProfile) -> IslandAppearancePreferences {
         switch profile {
         case .notch: notchAppearancePreferences
@@ -414,7 +424,44 @@ final class AppModel {
             oldValue.completedStaleThreshold != newValue.completedStaleThreshold {
             _cachedSessionBuckets = nil
         }
+
+        let closedChromeChanged =
+            oldValue.closedLeading != newValue.closedLeading
+            || oldValue.petKind != newValue.petKind
+            || oldValue.petEmoji != newValue.petEmoji
+            || oldValue.petTextScrolling != newValue.petTextScrolling
+            || oldValue.petTextVisibleLength != newValue.petTextVisibleLength
+            || oldValue.petCustomImagePath != newValue.petCustomImagePath
+            || oldValue.rightSlot != newValue.rightSlot
+            || oldValue.centerLabel != newValue.centerLabel
+
+        if closedChromeChanged {
+            overlay.refreshIslandRootView()
+        }
+
         refreshOverlayPlacementIfVisible()
+    }
+
+    /// Rebuilds the overlay SwiftUI tree so appearance edits show on the live island
+    /// without restarting the app. Returns false when the edited profile is not active.
+    @discardableResult
+    func refreshIslandAppearancePresentation(
+        for profile: IslandAppearanceDisplayProfile? = nil
+    ) -> Bool {
+        let target = profile ?? appearanceSettingsProfile
+        guard target == activeAppearanceProfile else {
+            let activeTitle = activeAppearanceProfile == .notch
+                ? lang.t("settings.appearance.profile.macbook.title")
+                : lang.t("settings.appearance.profile.external.title")
+            lastActionMessage = lang.t("settings.appearance.apply.wrongProfile", activeTitle)
+            return false
+        }
+
+        appearancePreferencesRevision &+= 1
+        overlay.refreshIslandRootView()
+        refreshOverlayPlacementIfVisible()
+        lastActionMessage = lang.t("settings.appearance.apply.success")
+        return true
     }
 
     private func persistAppearancePreferences(
@@ -422,6 +469,12 @@ final class AppModel {
         for profile: IslandAppearanceDisplayProfile
     ) {
         let defaults = UserDefaults.standard
+        defaults.set(preferences.closedLeading.rawValue, forKey: Self.appearanceDefaultsKey(profile, "closedLeading"))
+        defaults.set(preferences.petKind.rawValue, forKey: Self.appearanceDefaultsKey(profile, "petKind"))
+        defaults.set(preferences.petEmoji, forKey: Self.appearanceDefaultsKey(profile, "petEmoji"))
+        defaults.set(preferences.petTextScrolling, forKey: Self.appearanceDefaultsKey(profile, "petTextScrolling"))
+        defaults.set(preferences.petTextVisibleLength, forKey: Self.appearanceDefaultsKey(profile, "petTextVisibleLength"))
+        defaults.set(preferences.petCustomImagePath, forKey: Self.appearanceDefaultsKey(profile, "petCustomImagePath"))
         defaults.set(preferences.rightSlot.rawValue, forKey: Self.appearanceDefaultsKey(profile, "rightSlot"))
         defaults.set(preferences.centerLabel.rawValue, forKey: Self.appearanceDefaultsKey(profile, "centerLabel"))
         defaults.set(preferences.usageDisplay.rawValue, forKey: Self.appearanceDefaultsKey(profile, "usageDisplay"))
@@ -542,6 +595,18 @@ final class AppModel {
     private static func loadAppearancePreferences(for profile: IslandAppearanceDisplayProfile) -> IslandAppearancePreferences {
         let defaults = UserDefaults.standard
         return IslandAppearancePreferences(
+            closedLeading: IslandClosedLeading(
+                rawValue: defaults.string(forKey: appearanceDefaultsKey(profile, "closedLeading")) ?? ""
+            ) ?? .activityBars,
+            petKind: IslandPetKind(
+                rawValue: defaults.string(forKey: appearanceDefaultsKey(profile, "petKind")) ?? ""
+            ) ?? .scout,
+            petEmoji: defaults.string(forKey: appearanceDefaultsKey(profile, "petEmoji")) ?? "🐾",
+            petTextScrolling: defaults.object(forKey: appearanceDefaultsKey(profile, "petTextScrolling")) as? Bool ?? false,
+            petTextVisibleLength: IslandPetView.clampedTextVisibleLength(
+                defaults.integer(forKey: appearanceDefaultsKey(profile, "petTextVisibleLength"))
+            ),
+            petCustomImagePath: defaults.string(forKey: appearanceDefaultsKey(profile, "petCustomImagePath")) ?? "",
             rightSlot: IslandRightSlot(
                 rawValue: defaults.string(forKey: appearanceDefaultsKey(profile, "rightSlot"))
                     ?? defaults.string(forKey: islandRightSlotDefaultsKey)
@@ -565,7 +630,7 @@ final class AppModel {
                 rawValue: defaults.string(forKey: appearanceDefaultsKey(profile, "sessionGroup"))
                     ?? defaults.string(forKey: legacyIslandSessionGroupDefaultsKey)
                     ?? ""
-            ) ?? .none,
+            ) ?? .agent,
             sessionSort: IslandSessionSort(
                 rawValue: defaults.string(forKey: appearanceDefaultsKey(profile, "sessionSort"))
                     ?? defaults.string(forKey: legacyIslandSessionSortDefaultsKey)
@@ -590,7 +655,8 @@ final class AppModel {
         self.terminalJumpAction = terminalJumpAction
         self.isNotificationSessionAlreadyFrontmost = isNotificationSessionAlreadyFrontmost
         UserDefaults.standard.register(defaults: [
-            Self.showDockIconDefaultsKey: true,
+            // Feishu builds stay accessory-only — one island entry point, no extra menu-bar app menu.
+            Self.showDockIconDefaultsKey: !UpdateChecker.isFeishuIntegrationBuild,
             Self.hapticFeedbackEnabledDefaultsKey: false,
             Self.completionReplyEnabledDefaultsKey: false,
             Self.suppressFrontmostNotificationsDefaultsKey: true,
@@ -598,6 +664,11 @@ final class AppModel {
         isSoundMuted = UserDefaults.standard.bool(forKey: Self.soundMutedDefaultsKey)
         selectedSoundName = NotificationSoundService.selectedSoundName
         showDockIcon = UserDefaults.standard.bool(forKey: Self.showDockIconDefaultsKey)
+        if UpdateChecker.isFeishuIntegrationBuild,
+           !UserDefaults.standard.bool(forKey: Self.feishuDockIconMigrationKey) {
+            showDockIcon = false
+            UserDefaults.standard.set(true, forKey: Self.feishuDockIconMigrationKey)
+        }
         hapticFeedbackEnabled = UserDefaults.standard.bool(forKey: Self.hapticFeedbackEnabledDefaultsKey)
         suppressFrontmostNotifications = UserDefaults.standard.bool(forKey: Self.suppressFrontmostNotificationsDefaultsKey)
         if UserDefaults.standard.object(forKey: Self.showCodexUsageDefaultsKey) != nil {
@@ -691,7 +762,23 @@ final class AppModel {
             }
         }
         refreshOverlayDisplayConfiguration()
+        screenParametersObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didChangeScreenParametersNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                self?.refreshOverlayDisplayConfiguration()
+            }
+        }
         hasFinishedInit = true
+    }
+
+    /// Called when overlay placement switches between notch and top-bar profiles
+    /// so island chrome re-reads the matching appearance preferences.
+    func notifyActiveAppearanceProfileChanged() {
+        appearancePreferencesRevision &+= 1
+        refreshOverlayPlacementIfVisible()
     }
 
     var sessions: [AgentSession] {
@@ -845,14 +932,111 @@ final class AppModel {
             ?? surfacedSessions.first
     }
 
+    func islandSessionOverviewCounts(at referenceDate: Date = .now) -> IslandSessionOverviewCounts {
+        let sessions = surfacedSessions
+        guard !sessions.isEmpty else { return .zero }
+
+        let threshold = completedStaleThreshold.seconds
+        let waiting = sessions.filter(\.phase.requiresAttention).count
+        let running = sessions.filter { $0.phase == .running }.count
+        let done = sessions.filter {
+            $0.phase == .completed
+                && !$0.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
+                && $0.islandPresence(at: referenceDate) != .inactive
+        }.count
+        let idle = sessions.filter {
+            guard $0.phase == .completed else { return false }
+            return $0.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
+                || $0.islandPresence(at: referenceDate) == .inactive
+        }.count
+
+        return IslandSessionOverviewCounts(
+            total: sessions.count,
+            waiting: waiting,
+            running: running,
+            done: done,
+            idle: idle
+        )
+    }
+
+    /// Compact running / done line for closed pill and opened header.
+    func islandClosedTaskBreakdownText(
+        compact: Bool = true,
+        at referenceDate: Date = .now
+    ) -> String? {
+        let overview = islandSessionOverviewCounts(at: referenceDate)
+        guard overview.total > 0 else { return nil }
+
+        let summary = IslandClosedSummary.make(from: surfacedSessions, overview: overview)
+        return summary.taskBreakdownText(
+            waitingLabel: lang.t("island.sessionOverview.waiting"),
+            runningLabel: lang.t("island.sessionOverview.running"),
+            doneLabel: lang.t("island.sessionOverview.done")
+        )
+    }
+
+    /// Compact closed-island summary from surfaced sessions.
+    func islandClosedSummary(at referenceDate: Date = .now) -> IslandClosedSummary {
+        IslandClosedSummary.make(
+            from: surfacedSessions,
+            overview: islandSessionOverviewCounts(at: referenceDate)
+        )
+    }
+
+    /// Left-slot payload for the closed island pill.
+    func islandClosedLeadingContent() -> IslandClosedLeadingContent {
+        let prefs = appearancePreferences(for: activeAppearanceProfile)
+        let mode = islandClosedMode
+        switch prefs.closedLeading {
+        case .activityBars:
+            return .activityBars(mode)
+        case .pet:
+            return .pet(
+                prefs.petKind,
+                emoji: prefs.petEmoji,
+                customImagePath: prefs.petCustomImagePath,
+                textScrolling: prefs.petTextScrolling,
+                textVisibleLength: prefs.petTextVisibleLength,
+                activityMode: mode
+            )
+        case .summary:
+            let summary = islandClosedSummary()
+            if let breakdown = summary.taskBreakdownText(
+                waitingLabel: lang.t("island.sessionOverview.waiting"),
+                runningLabel: lang.t("island.sessionOverview.running"),
+                doneLabel: lang.t("island.sessionOverview.done")
+            ) {
+                return .summary(breakdown)
+            }
+            return .summary(summary.compactText(idleText: lang.t("island.closed.summary.idle")))
+        }
+    }
+
     /// Text to show in the closed island's center label. Respects the
     /// `islandCenterLabel` user preference.
     func islandClosedLabel() -> String? {
-        guard islandCenterLabel != .off,
-              let session = islandClosedSpotlight else { return nil }
+        guard islandCenterLabel != .off else { return nil }
+
+        let prefs = appearancePreferences(for: activeAppearanceProfile)
 
         switch islandCenterLabel {
         case .off:
+            return nil
+        case .summary:
+            // Custom content already occupies the left slot — skip the center line to
+            // avoid crowding the pill into an ellipsis on external displays.
+            if prefs.closedLeading == .pet { return nil }
+            let summary = islandClosedSummary()
+            guard summary.taskCount > 0 else { return nil }
+            return summary.centerLabelText(idleText: lang.t("island.closed.summary.idle"))
+        case .sessionName, .agentAction:
+            break
+        }
+
+        guard let session = islandClosedSpotlight else { return nil }
+
+        switch islandCenterLabel {
+        case .off, .summary:
             return nil
         case .sessionName:
             let workspace = session.jumpTarget?.workspaceName ?? ""
@@ -902,6 +1086,14 @@ final class AppModel {
                 cells.append(.overflow(ordered.count - 7))
             }
             return cells.isEmpty ? nil : .agents(cells)
+        case .summary:
+            let summary = islandClosedSummary()
+            guard let text = summary.rightSlotText(
+                waitingLabel: lang.t("island.sessionOverview.waiting"),
+                runningLabel: lang.t("island.sessionOverview.running"),
+                doneLabel: lang.t("island.sessionOverview.done")
+            ) else { return nil }
+            return .summary(text)
         }
     }
 
@@ -1214,6 +1406,8 @@ final class AppModel {
     func refreshOverlayDisplayConfiguration() { overlay.refreshOverlayDisplayConfiguration() }
     func refreshOverlayPlacement() { overlay.refreshOverlayPlacement() }
     private func refreshOverlayPlacementIfVisible() { overlay.refreshOverlayPlacementIfVisible() }
+    func invalidateIslandContentLayout() { overlay.invalidateIslandContentLayout() }
+    func refreshIslandRootView() { overlay.refreshIslandRootView() }
     func notePointerInsideIslandSurface() { overlay.notePointerInsideIslandSurface() }
     func handlePointerExitedIslandSurface() { overlay.handlePointerExitedIslandSurface() }
     private func presentNotificationSurface(_ surface: IslandSurface) { overlay.presentNotificationSurface(surface) }
@@ -1241,6 +1435,7 @@ final class AppModel {
     }
 
     func showSettings() {
+        appearanceSettingsProfile = activeAppearanceProfile
         if let opener = openSettingsWindow {
             opener()
         } else {
@@ -1400,8 +1595,15 @@ final class AppModel {
 
     func dismissSession(_ sessionID: String) {
         state.dismissSession(id: sessionID)
+        _ = state.removeInvisibleSessions()
         dismissNotificationSurfaceIfPresent(for: sessionID)
         synchronizeSelection()
+        reconcileIslandSurfaceAfterStateChange()
+        refreshOverlayPlacementIfVisible()
+        discovery.scheduleCodexSessionPersistence()
+        discovery.scheduleClaudeSessionPersistence()
+        discovery.scheduleOpenCodeSessionPersistence()
+        discovery.scheduleCursorSessionPersistence()
     }
 
     func answerQuestion(for sessionID: String, answer: QuestionPromptResponse) {
@@ -1489,6 +1691,9 @@ final class AppModel {
         }
 
         state.apply(event)
+        if ingress == .bridge, state.sessions.contains(where: \.isVisibleInIsland) {
+            isResolvingInitialLiveSessions = false
+        }
         reconcileIslandSurfaceAfterStateChange()
         if ingress == .bridge {
             monitoring.markSessionAttached(for: event)

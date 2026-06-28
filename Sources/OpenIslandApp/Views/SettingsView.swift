@@ -6,9 +6,9 @@ import OpenIslandCore
 
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general
- case setup
- case feishu
- case display
+    case setup
+    case feishu
+    case display
     case sound
     case appearance
     case watch

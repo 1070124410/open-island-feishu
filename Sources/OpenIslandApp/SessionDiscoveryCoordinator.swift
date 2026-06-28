@@ -212,6 +212,10 @@ final class SessionDiscoveryCoordinator {
     }
 
     private func merge(discovered: AgentSession, into existing: AgentSession) -> AgentSession {
+        if existing.isUserDismissed {
+            return existing
+        }
+
         var merged = existing
         let discoveredIsNewer = discovered.updatedAt >= existing.updatedAt
 
@@ -467,7 +471,7 @@ final class SessionDiscoveryCoordinator {
         codexSessionPersistenceTask?.cancel()
 
         let records = state.sessions
-            .filter { $0.isTrackedLiveCodexSession && $0.updatedAt >= Date.now.addingTimeInterval(-86_400) }
+            .filter { $0.isTrackedLiveCodexSession && !$0.isUserDismissed && $0.updatedAt >= Date.now.addingTimeInterval(-86_400) }
             .map(CodexTrackedSessionRecord.init(session:))
         let store = codexSessionStore
 
@@ -484,6 +488,7 @@ final class SessionDiscoveryCoordinator {
             .filter {
                 $0.tool == .claudeCode
                     && $0.isTrackedLiveSession
+                    && !$0.isUserDismissed
                     && (prefix.isEmpty || !$0.id.hasPrefix(prefix))
                     && $0.updatedAt >= Date.now.addingTimeInterval(-86_400)
                     && ($0.jumpTarget != nil || $0.claudeMetadata?.transcriptPath != nil)
@@ -503,6 +508,7 @@ final class SessionDiscoveryCoordinator {
             .filter {
                 $0.tool == .openCode
                     && $0.isTrackedLiveSession
+                    && !$0.isUserDismissed
                     && $0.updatedAt >= Date.now.addingTimeInterval(-86_400)
             }
             .map(OpenCodeTrackedSessionRecord.init(session:))
@@ -520,6 +526,7 @@ final class SessionDiscoveryCoordinator {
             .filter {
                 $0.tool == .cursor
                     && $0.isTrackedLiveSession
+                    && !$0.isUserDismissed
                     && $0.updatedAt >= Date.now.addingTimeInterval(-86_400)
                     && ($0.jumpTarget != nil || $0.cursorMetadata?.conversationId != nil)
             }

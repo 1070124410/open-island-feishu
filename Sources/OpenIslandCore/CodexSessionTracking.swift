@@ -144,7 +144,7 @@ public struct CodexTrackedSessionRecord: Equatable, Codable, Sendable {
 public extension CodexTrackedSessionRecord {
     var restorableSession: AgentSession {
         var session = session
-        session.attachmentState = .stale
+        session.applyingRestoredLiveSessionDefaults()
         return session
     }
 

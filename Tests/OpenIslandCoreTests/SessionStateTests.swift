@@ -883,7 +883,12 @@ struct SessionStateTests {
             .compactMap { $0["hooks"] as? [[String: Any]] }
             .flatMap { $0 }
             .first(where: { $0["command"] as? String == "'/tmp/OpenIslandHooks'" })
-        #expect(sessionStartGroups?.contains(where: { $0["matcher"] as? String == "startup|resume" }) == true)
+        #expect(sessionStartGroups?.contains(where: { ($0["matcher"] as? String) == "startup|resume" }) == false)
+        #expect(sessionStartGroups?.contains(where: { group in
+            (group["hooks"] as? [[String: Any]])?.contains(where: {
+                $0["command"] as? String == "'/tmp/OpenIslandHooks'"
+            }) == true
+        }) == true)
         #expect(managedPermissionHook?["timeout"] as? Int == CodexHookInstaller.managedInteractiveTimeout)
         #expect(hooks?["PreToolUse"] == nil)
         #expect(hooks?["PostToolUse"] == nil)

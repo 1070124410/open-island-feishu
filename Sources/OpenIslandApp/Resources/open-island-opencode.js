@@ -12,7 +12,7 @@ function debugLog(msg) {
 
 const SOCKET_PATH =
   process.env.OPEN_ISLAND_SOCKET_PATH ||
-  `${process.env.HOME || homedir()}/Library/Application Support/OpenIsland/bridge.sock`;
+  `${process.env.HOME || homedir()}/Library/Application Support/OpenIslandFeishu/bridge.sock`;
 
 function encodeEnvelope(command) {
   return JSON.stringify({ type: "command", command }) + "\n";

@@ -242,13 +242,27 @@ final class OverlayUICoordinator {
     }
 
     func refreshOverlayPlacement() {
+        let previousMode = overlayPlacementDiagnostics?.mode
         overlayPlacementDiagnostics = overlayPanelController.reposition(
             preferredScreenID: preferredOverlayScreenID
         )
+        if previousMode != overlayPlacementDiagnostics?.mode {
+            appModel?.notifyActiveAppearanceProfileChanged()
+        }
     }
 
     func refreshOverlayPlacementIfVisible() {
         refreshOverlayPlacement()
+    }
+
+    /// Forces the overlay hosting view to rebuild so appearance edits apply immediately.
+    func refreshIslandRootView() {
+        overlayPanelController.refreshIslandRootView()
+    }
+
+    /// Nudge layout only — prefer `refreshIslandRootView()` for appearance content changes.
+    func invalidateIslandContentLayout() {
+        overlayPanelController.invalidateContentLayout()
     }
 
     // MARK: - Pointer tracking

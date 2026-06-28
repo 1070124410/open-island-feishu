@@ -24,6 +24,14 @@ enum AgentGridCell: Equatable {
 enum IslandRightSlotContent: Equatable {
     case count(Int)              // "×N" badge
     case agents([AgentGridCell]) // balanced grid, one tile per session
+    case summary(String)         // compact agent / task line
+}
+
+/// Left-slot payload for the closed island pill.
+enum IslandClosedLeadingContent: Equatable, Hashable {
+    case activityBars(UnifiedBars.Mode)
+    case pet(IslandPetKind, emoji: String, customImagePath: String, textScrolling: Bool, textVisibleLength: Int, activityMode: UnifiedBars.Mode)
+    case summary(String)
 }
 
 // MARK: - Right-slot renderers
@@ -41,6 +49,12 @@ struct V6RightSlotView: View {
                 .foregroundStyle(V6Palette.paper.opacity(0.72))
         case .agents(let cells):
             AgentsGridBody(cells: cells)
+        case .summary(let text):
+            Text(text)
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(V6Palette.paper.opacity(0.72))
         }
     }
 
@@ -61,6 +75,8 @@ struct V6RightSlotView: View {
             let maxRow = rows.max() ?? 0
             let geom = cellGeometry(rowCount: rows.count)
             return CGFloat(maxRow) * geom.cell + CGFloat(max(0, maxRow - 1)) * geom.gap
+        case .summary(let text):
+            return V6CenterLabelView.intrinsicWidth(of: text) * 0.92
         }
     }
 
@@ -199,7 +215,53 @@ struct V6CenterLabelView: View {
     }
 
     static func intrinsicWidth(of text: String) -> CGFloat {
-        CGFloat(Double(text.count) * 7.3 + 10)
+        var width: CGFloat = 10
+        for scalar in text.unicodeScalars {
+            width += scalar.value <= 127 ? 7.3 : 11.0
+        }
+        return width
+    }
+}
+
+// MARK: - Left-slot renderers
+
+struct V6ClosedLeadingView: View {
+    let content: IslandClosedLeadingContent
+    let size: CGFloat
+
+    var body: some View {
+        switch content {
+        case .activityBars(let mode):
+            UnifiedBars(mode: mode, size: size)
+                .frame(width: size, height: size)
+        case .pet(let kind, let emoji, let customPath, let textScrolling, let textVisibleLength, let mode):
+            IslandPetView(
+                kind: kind,
+                emoji: emoji,
+                customImagePath: customPath,
+                textScrolling: textScrolling,
+                textVisibleLength: textVisibleLength,
+                activityMode: mode,
+                size: size
+            )
+        case .summary(let text):
+            Text(text)
+                .font(.system(size: 10.5, weight: .semibold, design: .monospaced))
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(V6Palette.paper.opacity(0.88))
+        }
+    }
+
+    static func intrinsicWidth(of content: IslandClosedLeadingContent, size: CGFloat) -> CGFloat {
+        switch content {
+        case .activityBars:
+            return size
+        case .pet(let kind, _, _, _, let textVisibleLength, _):
+            return IslandPetView.intrinsicWidth(size: size, kind: kind, textVisibleLength: textVisibleLength)
+        case .summary(let text):
+            return V6CenterLabelView.intrinsicWidth(of: text) * 0.92
+        }
     }
 }
 
@@ -209,11 +271,12 @@ struct V6CenterLabelView: View {
 /// Pure view — takes all parameters explicitly so it can be reused for the
 /// live settings preview and the real island.
 struct V6ClosedPill: View {
-    var mode: UnifiedBars.Mode
+    var leading: IslandClosedLeadingContent
     var label: String?          // suppressed automatically in MacBook layout
     var rightSlot: IslandRightSlotContent?
     var layout: V6ClosedLayout
     var height: CGFloat = 32
+    var leadingSize: CGFloat = 24
 
     /// MacBook mode only — width of the physical notch cutout to wrap.
     var physicalNotchWidth: CGFloat = 0
@@ -241,7 +304,7 @@ struct V6ClosedPill: View {
     // MARK: External (fluid)
 
     private var externalBody: some View {
-        let glyphW: CGFloat = 24
+        let glyphW = V6ClosedLeadingView.intrinsicWidth(of: leading, size: leadingSize)
         let labelW = label.map { V6CenterLabelView.intrinsicWidth(of: $0) } ?? 0
         let rightW = rightSlot.map { V6RightSlotView.intrinsicWidth(of: $0) } ?? 0
 
@@ -255,8 +318,8 @@ struct V6ClosedPill: View {
                 .fill(V6Palette.ink)
 
             HStack(spacing: 0) {
-                UnifiedBars(mode: mode, size: 24)
-                    .frame(width: glyphW, height: 24)
+                V6ClosedLeadingView(content: leading, size: leadingSize)
+                    .frame(width: glyphW, height: leadingSize)
 
                 if let label {
                     V6CenterLabelView(text: label)
@@ -279,7 +342,7 @@ struct V6ClosedPill: View {
             value: AnyHashable([
                 AnyHashable(label ?? ""),
                 AnyHashable(rightSlot.map(RightSlotKey.init) ?? .none),
-                AnyHashable(mode),
+                AnyHashable(leading),
             ])
         )
     }
@@ -289,14 +352,15 @@ struct V6ClosedPill: View {
     private var macbookBody: some View {
         let halfReserve: CGFloat = 44
         let outer = halfReserve + physicalNotchWidth + halfReserve
+        let glyphW = V6ClosedLeadingView.intrinsicWidth(of: leading, size: leadingSize)
 
         return ZStack {
             V6ClosedPillShape()
                 .fill(V6Palette.ink)
 
             HStack(spacing: 0) {
-                UnifiedBars(mode: mode, size: 24)
-                    .frame(width: 24, height: 24)
+                V6ClosedLeadingView(content: leading, size: leadingSize)
+                    .frame(width: glyphW, height: leadingSize)
 
                 Spacer(minLength: 0)
 
@@ -318,11 +382,13 @@ enum V6ClosedLayout: Equatable {
 private enum RightSlotKey: Hashable {
     case count(Int)
     case agents(Int)
+    case summary(String)
 
     init(_ content: IslandRightSlotContent) {
         switch content {
-        case .count(let n):    self = .count(n)
-        case .agents(let cs):  self = .agents(cs.count)
+        case .count(let n):       self = .count(n)
+        case .agents(let cs):     self = .agents(cs.count)
+        case .summary(let text):  self = .summary(text)
         }
     }
 }
@@ -332,7 +398,7 @@ private enum RightSlotKey: Hashable {
 /// Fixed-width pill that mimics the real island inside the settings-tab
 /// preview stage. Parameters match what the tab exposes.
 struct IslandPreviewPill: View {
-    let mode: UnifiedBars.Mode
+    let leading: IslandClosedLeadingContent
     let label: String?
     let rightSlot: IslandRightSlotContent?
     let layout: V6ClosedLayout
@@ -341,7 +407,7 @@ struct IslandPreviewPill: View {
 
     var body: some View {
         V6ClosedPill(
-            mode: mode,
+            leading: leading,
             label: label,
             rightSlot: rightSlot,
             layout: layout,

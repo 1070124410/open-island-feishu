@@ -1,35 +1,30 @@
 # Open Island + 飞书远程审批
 
-本 fork 在 [8676311081/open-island](https://github.com/8676311081/open-island) 基础上集成 [open-island-feishu](https://github.com/1070124410/open-island-feishu) sidecar：
+本仓库 **Open Island Feishu** 在 [Open Island / open-vibe-island](https://github.com/Octane0411/open-vibe-island) 基础上集成 [vibe-island-feishu](https://github.com/1070124410/vibe-island-feishu) sidecar：
 
-- **Settings → 飞书**：原生配置页（凭据、超时、Hook 注入、测试卡片）
-- **菜单栏 → 飞书远程审批**：快捷打开设置 / 暂停推送
+- **设置 → 飞书远程审批**：凭据、超时、Hook 注入、测试卡片、新手引导
+- **岛栏 → 齿轮 / 飞书入口**：快捷打开设置或飞书 Tab
+- **与官方 Open Island 并存**：独立 Bundle ID `app.openisland.feishu`，数据目录 `~/Library/Application Support/OpenIslandFeishu/`
 
 ## 依赖
 
-1. 安装 sidecar：`~/open-island-feishu/scripts/install.sh`
+1. 安装 sidecar：`git clone https://github.com/1070124410/vibe-island-feishu.git ~/open-island-feishu && cd ~/open-island-feishu && ./scripts/install.sh`
 2. 确保 `feishu-bridged` 在运行（launchd `app.openisland.feishu`）
 3. Admin API 默认：`http://127.0.0.1:8742`
 
-## 构建
+## 构建与安装
 
 ```bash
-cd ~/open-island
-swift build
-open Package.swift
+cd open-island-feishu
+chmod +x scripts/package-feishu-app.sh
+OPEN_ISLAND_VERSION=0.0.1 zsh scripts/package-feishu-app.sh
+cp -R "output/package/Open Island Feishu.app" /Applications/
 ```
 
-Sidecar 为独立 MIT 项目；Open Island 本体仍为 GPL-3.0。
+Sidecar 为独立 MIT 项目；Open Island Feishu 本体为 GPL-3.0。见 [NOTICE](../NOTICE)。
 
-## 自动更新（Sparkle）
+## 自动更新
 
-官方 appcast 指向 [Octane0411/open-vibe-island](https://github.com/Octane0411/open-vibe-island)（当前最新 **v1.1.3**）。
+**请勿**对本应用使用上游 Open Island 的 Sparkle 更新源——会安装无飞书集成的官方包。
 
-**飞书定制版（`*-feishu`）请勿点「更新到 v1.1.3」**——会安装无飞书 Tab 的官方包。
-
-定制版打包时会移除 `SUFeedURL` 并关闭 Sparkle 自动检查。重新安装：
-
-```bash
-OPEN_ISLAND_VERSION=1.0.29-feishu zsh ~/open-island/scripts/package-app.sh
-cp -R ~/open-island/output/package/Open\ Island.app /Applications/
-```
+请从 [open-island-feishu Releases](https://github.com/1070124410/open-island-feishu/releases) 获取新版本。打包时会移除 `SUFeedURL` 并关闭 Sparkle 自动检查。
