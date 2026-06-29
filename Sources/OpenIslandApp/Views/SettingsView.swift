@@ -262,13 +262,16 @@ struct DisplaySettingsPane: View {
                 )) {
                     Text(lang.t("settings.general.automatic")).tag(OverlayDisplayOption.automaticID)
                     ForEach(model.overlayDisplayOptions) { option in
-                        Text(option.title).tag(option.id)
+                        // 把 OverlayDisplayResolver 已经计算好的 subtitle（"Built-in notch · 3024×1964"
+                        // / "Top-bar fallback · 1920×1080"）露给用户，方便切换前判断目标屏是哪类。
+                        Text("\(option.title) — \(option.subtitle)").tag(option.id)
                     }
                 }
             }
 
             if let diag = model.overlayPlacementDiagnostics {
                 Section(lang.t("settings.display.diagnostics")) {
+                    placementModeCallout(diag: diag)
                     LabeledContent(lang.t("settings.display.currentScreen"), value: diag.targetScreenName)
                     LabeledContent(lang.t("settings.display.layoutMode"), value: diag.modeDescription)
                 }
@@ -276,6 +279,32 @@ struct DisplaySettingsPane: View {
         }
         .formStyle(.grouped)
         .navigationTitle(lang.t("settings.tab.display"))
+    }
+
+    // 高对比度的当前 placement mode 提示，让"切了 picker → mode 跟随刷新"这件事
+    // 在 SettingsView 内可见。便于用户确认 picker 真的生效，也为后续 panel-size
+    // / IslandPanelView 双 layout 的工作铺垫感知通道。
+    @ViewBuilder
+    private func placementModeCallout(diag: OverlayPlacementDiagnostics) -> some View {
+        let isNotch = diag.mode == .notch
+        let symbolName = isNotch ? "rectangle.tophalf.inset.filled" : "rectangle.topthird.inset.filled"
+        let tint: Color = isNotch ? .accentColor : .orange
+
+        HStack(spacing: 12) {
+            Image(systemName: symbolName)
+                .font(.system(size: 22, weight: .semibold))
+                .foregroundStyle(tint)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(diag.modeDescription)
+                    .font(.headline)
+                Text(diag.targetDescription)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
     }
 }
 

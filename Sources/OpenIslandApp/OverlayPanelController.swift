@@ -209,9 +209,10 @@ final class OverlayPanelController {
         }
 
         let notchSize = screen.notchSize
-        let screenFrame = screen.frame
-        let notchX = screenFrame.midX - notchSize.width / 2
-        let notchY = screenFrame.maxY - notchSize.height
+        // panel 已经统一贴物理屏顶，notchRect 也跟着用 frame.maxY，
+        // 这样 closed surface 的 hit area 跟 panel 顶部对齐。
+        let notchX = screen.frame.midX - notchSize.width / 2
+        let notchY = screen.frame.maxY - notchSize.height
         notchRect = NSRect(x: notchX, y: notchY, width: notchSize.width, height: notchSize.height)
     }
 
@@ -470,6 +471,10 @@ final class OverlayPanelController {
 
     private func panelFrame(for model: AppModel?, on screen: NSScreen) -> NSRect {
         let size = panelSize(for: model, on: screen)
+        // 两种 mode 都顶贴物理屏顶：
+        //   - notch mode 时 panel 下半身覆盖刘海
+        //   - topBar mode 时 panel 上沿覆盖 menubar 24pt 区域，closed bar 与 menubar 同高，
+        //     视觉上更接近 v0.0.4 的体验（不会让 bar 漂在屏幕中间）
         return NSRect(
             x: screen.frame.midX - size.width / 2,
             y: screen.frame.maxY - size.height,
@@ -481,8 +486,22 @@ final class OverlayPanelController {
     /// Always returns the maximum (opened) panel size so the window never
     /// needs to resize.  All visual transitions are driven purely by SwiftUI
     /// inside this fixed-size window.
+    ///
+    /// **Top-bar 模式特殊处理**：外接屏 panel 使用固定的紧凑尺寸
+    /// (OverlayDisplayResolver.topBarPanelSize ≈ 480×96)，绕开 notch 几何
+    /// 公式。代价：opened 时 approval / question / completion card 会被裁剪，
+    /// Round 3+ 再考虑 detached popup window 或 floating menubar 的方案。
     private func panelSize(for model: AppModel?, on screen: NSScreen) -> CGSize {
+        let mode = OverlayDisplayResolver.placementMode(for: screen)
         let insets = panelShadowInsets
+
+        if mode == .topBar {
+            let compact = OverlayDisplayResolver.topBarPanelSize
+            return CGSize(
+                width: compact.width + insets.horizontal * 2,
+                height: compact.height + insets.bottom
+            )
+        }
 
         guard let model else {
             return CGSize(

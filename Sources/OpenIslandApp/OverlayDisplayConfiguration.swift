@@ -57,7 +57,28 @@ struct OverlayPlacementDiagnostics {
 }
 
 enum OverlayDisplayResolver {
-    static let defaultPanelSize = NSSize(width: 708, height: 514)
+    /// 内建刘海屏（notch mode）使用的面板尺寸 —— 历史值，不改。
+    static let notchPanelSize = NSSize(width: 708, height: 514)
+    /// 外接屏 / 无刘海机型（top bar fallback mode）使用的紧凑面板尺寸。
+    /// 480×96 能容下 detailed closed state 的一行文字 + 计数，
+    /// 视觉上明显小于 notch 尺寸，让用户一眼看出 "这块屏没刘海"。
+    static let topBarPanelSize = NSSize(width: 480, height: 96)
+
+    /// 旧调用点 fallback —— 在拿不到 screen 时（早期初始化）默认按 notch 尺寸预留。
+    static let defaultPanelSize = notchPanelSize
+
+    /// 按 mode 返回默认面板尺寸，供 OverlayPanelController 在不同 screen 上选用。
+    static func defaultPanelSize(for mode: OverlayPlacementMode) -> NSSize {
+        switch mode {
+        case .notch:  return notchPanelSize
+        case .topBar: return topBarPanelSize
+        }
+    }
+
+    /// 暴露给 OverlayPanelController：判定某块 screen 应该用 notch 还是 topBar 模式。
+    static func placementMode(for screen: NSScreen) -> OverlayPlacementMode {
+        isNotched(screen) ? .notch : .topBar
+    }
 
     static func availableDisplayOptions() -> [OverlayDisplayOption] {
         NSScreen.screens.map { screen in
@@ -137,10 +158,6 @@ enum OverlayDisplayResolver {
         }
 
         return (screens[0], "automatic")
-    }
-
-    private static func placementMode(for screen: NSScreen) -> OverlayPlacementMode {
-        isNotched(screen) ? .notch : .topBar
     }
 
     private static func isNotched(_ screen: NSScreen) -> Bool {
