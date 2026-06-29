@@ -1,0 +1,51 @@
+name: Release Feishu
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Install icon dependencies
+        run: pip3 install Pillow
+
+      - name: Build Open Island Feishu
+        env:
+          OPEN_ISLAND_VERSION: ${{ steps.version.outputs.version }}
+          OPEN_ISLAND_BUILD_NUMBER: ${{ github.run_number }}
+        run: zsh scripts/package-feishu-app.sh
+
+      - name: Verify artifacts
+        run: |
+          test -f "output/package/Open Island Feishu.zip"
+          test -f "output/package/Open Island Feishu.dmg"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
+            "output/package/Open Island Feishu.app/Contents/Info.plist" | grep -q 'app.openisland.feishu'
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NOTES_FILE="docs/release-notes/${GITHUB_REF_NAME}.md"
+          if [[ -f "$NOTES_FILE" ]]; then
+            NOTES_ARG=(--notes-file "$NOTES_FILE")
+          else
+            NOTES_ARG=(--generate-notes)
+          fi
+          gh release create "$GITHUB_REF_NAME" \
+            --title "Open Island Feishu ${GITHUB_REF_NAME#v}" \
+            "${NOTES_ARG[@]}" \
+            "output/package/Open Island Feishu.dmg#Open Island Feishu.dmg (macOS)" \
+            "output/package/Open Island Feishu.zip#Open Island Feishu.zip (macOS)"
