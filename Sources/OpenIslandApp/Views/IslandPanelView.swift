@@ -1,4 +1,5 @@
 import SwiftUI
+import AppKit
 @preconcurrency import MarkdownUI
 import OpenIslandCore
 
@@ -18,32 +19,118 @@ private struct ContentHeightKey: PreferenceKey {
 
 /// Auto-height container: renders content directly (auto-sizing).
 /// When content exceeds maxHeight, wraps in ScrollView at fixed maxHeight.
+/// A small drag handle at the bottom lets the user override the maxHeight;
+/// the chosen value is persisted via AppStorage so it survives panel close
+/// and app restart. Pass a unique `storageKey` per call site if you want
+/// independent persistence.
 private struct AutoHeightScrollView<Content: View>: View {
     let maxHeight: CGFloat
+    var storageKey: String = "oif.autoHeightScrollView.maxHeight"
+    var minResize: CGFloat = 80
+    /// nil = compute dynamically as 0.7 × current screen's visibleFrame height.
+    var maxResize: CGFloat? = nil
     @ViewBuilder let content: () -> Content
-    @State private var contentHeight: CGFloat = 0
 
-    private var isScrollable: Bool { contentHeight > maxHeight }
+    @State private var contentHeight: CGFloat = 0
+    @State private var dragStartHeight: CGFloat = 0
+    @State private var isDragging: Bool = false
+    @State private var isHoveringHandle: Bool = false
+    // -1 sentinel = unset, fall back to the caller-provided default.
+    @AppStorage private var storedMaxHeight: Double
+
+    init(
+        maxHeight: CGFloat,
+        storageKey: String = "oif.autoHeightScrollView.maxHeight",
+        minResize: CGFloat = 80,
+        maxResize: CGFloat? = nil,
+        @ViewBuilder content: @escaping () -> Content
+    ) {
+        self.maxHeight = maxHeight
+        self.storageKey = storageKey
+        self.minResize = minResize
+        self.maxResize = maxResize
+        self.content = content
+        self._storedMaxHeight = AppStorage(wrappedValue: -1, storageKey)
+    }
+
+    private var effectiveMaxResize: CGFloat {
+        if let m = maxResize { return m }
+        // Recomputed every body invocation so multi-monitor users get a value
+        // sensible for whichever screen the overlay currently lives on.
+        let screenH = NSScreen.main?.visibleFrame.height ?? 800
+        return max(200, screenH * 0.7)
+    }
+    private var effectiveMaxHeight: CGFloat {
+        storedMaxHeight > 0 ? CGFloat(storedMaxHeight) : maxHeight
+    }
+    private var isScrollable: Bool { contentHeight > effectiveMaxHeight }
 
     var body: some View {
-        // Always use ScrollView so the content gets unconstrained vertical
-        // space for measurement.  Without this, a tight parent window can
-        // cap the GeometryReader measurement, making long content appear
-        // truncated instead of scrollable.
-        ScrollView(.vertical) {
-            content()
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.preference(key: ContentHeightKey.self, value: geo.size.height)
+        VStack(spacing: 0) {
+            // Always use ScrollView so the content gets unconstrained vertical
+            // space for measurement.  Without this, a tight parent window can
+            // cap the GeometryReader measurement, making long content appear
+            // truncated instead of scrollable.
+            ScrollView(.vertical) {
+                content()
+                    .background(
+                        GeometryReader { geo in
+                            Color.clear.preference(key: ContentHeightKey.self, value: geo.size.height)
+                        }
+                    )
+                    .onPreferenceChange(ContentHeightKey.self) { height in
+                        if height > 0 { contentHeight = height }
                     }
-                )
-                .onPreferenceChange(ContentHeightKey.self) { height in
-                    if height > 0 { contentHeight = height }
-                }
+            }
+            .scrollBounceBehavior(.basedOnSize)
+            .scrollIndicators(isScrollable ? .automatic : .hidden)
+            .frame(height: contentHeight > 0 ? min(contentHeight, effectiveMaxHeight) : nil)
+
+            resizeHandle
         }
-        .scrollBounceBehavior(.basedOnSize)
-        .scrollIndicators(isScrollable ? .automatic : .hidden)
-        .frame(height: contentHeight > 0 ? min(contentHeight, maxHeight) : nil)
+    }
+
+    private var resizeHandle: some View {
+        // Small capsule with generous hit area; drag vertically to set the
+        // persisted maxHeight. Double-click resets to caller default.
+        ZStack {
+            Color.clear.frame(height: 10)
+            Capsule()
+                .fill(.white.opacity(isHoveringHandle || isDragging ? 0.55 : 0.18))
+                .frame(width: 36, height: 3)
+                .animation(.easeOut(duration: 0.12), value: isHoveringHandle)
+        }
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            isHoveringHandle = hovering
+            if hovering {
+                NSCursor.resizeUpDown.set()
+            } else if !isDragging {
+                NSCursor.arrow.set()
+            }
+        }
+        .gesture(
+            DragGesture(minimumDistance: 1)
+                .onChanged { value in
+                    if !isDragging {
+                        dragStartHeight = effectiveMaxHeight
+                        isDragging = true
+                    }
+                    let candidate = dragStartHeight + value.translation.height
+                    storedMaxHeight = Double(max(minResize, min(effectiveMaxResize, candidate)))
+                }
+                .onEnded { _ in
+                    isDragging = false
+                    if !isHoveringHandle { NSCursor.arrow.set() }
+                }
+        )
+        .simultaneousGesture(
+            TapGesture(count: 2).onEnded {
+                // Double-click to reset to default.
+                storedMaxHeight = -1
+            }
+        )
+        .help("拖拽调整高度，双击恢复默认")
     }
 }
 
@@ -1582,7 +1669,12 @@ private struct IslandSessionRow: View {
     private var completionActionBody: some View {
         VStack(alignment: .leading, spacing: 0) {
             if !completionMessageText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                AutoHeightScrollView(maxHeight: 160) {
+                AutoHeightScrollView(
+                    maxHeight: 160,
+                    storageKey: "oif.completionCard.maxHeight",
+                    minResize: 80
+                    // maxResize: nil → 0.7 × screen height, recomputed per body
+                ) {
                     Markdown(completionMessageText)
                         .markdownTheme(.completionCard)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
