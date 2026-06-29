@@ -1,9 +1,15 @@
 name: Release Feishu
 
 on:
-  push:
-    tags:
-      - 'v*'
+  # Manual-only. Tag pushes used to trigger this and silently overwrite
+  # the sidecar-embedded .app uploaded out-of-band (see v0.0.7 incident).
+  # Re-enable the tag trigger only after the workflow learns to embed
+  # the Feishu sidecar (OPEN_ISLAND_SIDECAR_DIR) itself.
+  #
+  # To run manually: GitHub UI → Actions → "Release Feishu" → Run workflow
+  # → pick the tag (e.g. v0.0.8) as the ref. GITHUB_REF_NAME below will
+  # resolve to the picked tag.
+  workflow_dispatch:
 
 permissions:
   contents: write
