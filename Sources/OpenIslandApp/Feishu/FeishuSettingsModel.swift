@@ -266,10 +266,27 @@ final class FeishuSettingsModel {
     }
 
     func installSidecarIfNeeded() async {
-        let script = FileManager.default.homeDirectoryForCurrentUser
+        // 优先用 .app 内嵌的 sidecar（v0.0.7+ 起随 .app 一起分发），
+        // install.sh 自身会把 sidecar 镜像到 ~/open-island-feishu/，所以
+        // 后续逻辑里 ~/open-island-feishu/scripts/install.sh 也会自动到位。
+        let arch: String
+        #if arch(arm64)
+        arch = "darwin-arm64"
+        #else
+        arch = "darwin-amd64"
+        #endif
+        let bundledScript = Bundle.main.resourceURL?
+            .appendingPathComponent("sidecar/\(arch)/scripts/install.sh")
+        let homeScript = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("open-island-feishu/scripts/install.sh")
-        guard FileManager.default.fileExists(atPath: script.path) else {
-            lastError = "未找到 ~/open-island-feishu/scripts/install.sh"
+
+        let script: URL
+        if let b = bundledScript, FileManager.default.fileExists(atPath: b.path) {
+            script = b
+        } else if FileManager.default.fileExists(atPath: homeScript.path) {
+            script = homeScript
+        } else {
+            lastError = "未找到 install.sh：.app 内 sidecar 资源缺失，~/open-island-feishu/scripts/install.sh 也不存在"
             return
         }
         isBusy = true

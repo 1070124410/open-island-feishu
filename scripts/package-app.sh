@@ -74,6 +74,38 @@ chmod +x \
     "$bundle_dir/Contents/Helpers/OpenIslandHooks" \
     "$bundle_dir/Contents/Helpers/OpenIslandSetup"
 
+# Embed Feishu sidecar so the in-app "Install local feishu plugin" button
+# works out-of-the-box without a separate download. Each tarball in
+# OPEN_ISLAND_SIDECAR_DIR (open-island-feishu-darwin-<arch>.tar.gz) is
+# unpacked into Contents/Resources/sidecar/darwin-<arch>/, and every
+# Mach-O binary under it gets ad-hoc signed so the outer bundle signature
+# stays valid.
+if [[ -n "${OPEN_ISLAND_SIDECAR_DIR:-}" && -d "${OPEN_ISLAND_SIDECAR_DIR:-}" ]]; then
+    sidecar_dst="$bundle_dir/Contents/Resources/sidecar"
+    mkdir -p "$sidecar_dst"
+    for tgz in "$OPEN_ISLAND_SIDECAR_DIR"/open-island-feishu-darwin-*.tar.gz; do
+        [[ -f "$tgz" ]] || continue
+        arch_id="${tgz##*open-island-feishu-}"; arch_id="${arch_id%.tar.gz}"
+        tmpdir="$(mktemp -d)"
+        tar -xzf "$tgz" -C "$tmpdir"
+        # Tarball top-level is "open-island-feishu-darwin-<arch>/" — flatten
+        # one level so the path becomes sidecar/darwin-<arch>/{bin,scripts,launchd}.
+        rm -rf "$sidecar_dst/$arch_id"
+        mv "$tmpdir/open-island-feishu-$arch_id" "$sidecar_dst/$arch_id"
+        rm -rf "$tmpdir"
+        for bin in "$sidecar_dst/$arch_id/bin/"*; do
+            [[ -f "$bin" ]] || continue
+            chmod +x "$bin"
+            codesign --force --sign - "$bin" 2>/dev/null || true
+        done
+        find "$sidecar_dst/$arch_id/scripts" -type f \( -name '*.sh' -o -name '*.command' \) -exec chmod +x {} \; 2>/dev/null || true
+        [[ -f "$sidecar_dst/$arch_id/Install.command" ]] && chmod +x "$sidecar_dst/$arch_id/Install.command"
+        echo "  ✓ embedded sidecar: $arch_id"
+    done
+elif [[ -n "${OPEN_ISLAND_SIDECAR_DIR:-}" ]]; then
+    echo "WARNING: OPEN_ISLAND_SIDECAR_DIR='$OPEN_ISLAND_SIDECAR_DIR' is set but not a directory; skipping sidecar embed." >&2
+fi
+
 # Add rpath so the binary can find Sparkle.framework in Contents/Frameworks/.
 install_name_tool -add_rpath @loader_path/../Frameworks "$bundle_dir/Contents/MacOS/OpenIslandApp" 2>/dev/null || true
 
