@@ -34,6 +34,7 @@ jobs:
         run: zsh scripts/package-feishu-app.sh
 
       - name: Verify universal binary
+        id: verify
         run: |
           binary="output/package/Open Island Feishu.app/Contents/MacOS/OpenIslandApp"
           lipo -info "$binary" | tee /dev/stderr | grep -q 'arm64'
@@ -42,6 +43,9 @@ jobs:
             "output/package/Open Island Feishu.app/Contents/Info.plist" | grep -q 'app.openisland.feishu'
           /usr/libexec/PlistBuddy -c "Print :SUFeedURL" \
             "output/package/Open Island Feishu.app/Contents/Info.plist" | grep -q 'appcast-feishu.xml'
+          build_number="$(/usr/libexec/PlistBuddy -c "Print :CFBundleVersion" \
+            "output/package/Open Island Feishu.app/Contents/Info.plist")"
+          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
 
       - name: Sign update archive (Sparkle EdDSA)
         id: sparkle_sign
@@ -62,15 +66,6 @@ jobs:
           echo "length=$length" >> "$GITHUB_OUTPUT"
           echo "signed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Update appcast-feishu.xml
-        if: steps.sparkle_sign.outputs.signed == 'true'
-        run: |
-          zsh scripts/update-feishu-appcast.sh \
-            "${{ steps.version.outputs.version }}" \
-            "${{ github.run_number }}" \
-            "${{ steps.sparkle_sign.outputs.ed_signature }}" \
-            "${{ steps.sparkle_sign.outputs.length }}"
-
       - name: Commit appcast to main
         if: steps.sparkle_sign.outputs.signed == 'true'
         run: |
@@ -79,13 +74,17 @@ jobs:
           git fetch origin main
           git checkout main
           git pull --ff-only origin main
-          git checkout "$GITHUB_SHA" -- appcast-feishu.xml
+          zsh scripts/update-feishu-appcast.sh \
+            "${{ steps.version.outputs.version }}" \
+            "${{ steps.verify.outputs.build_number }}" \
+            "${{ steps.sparkle_sign.outputs.ed_signature }}" \
+            "${{ steps.sparkle_sign.outputs.length }}"
           git add appcast-feishu.xml
           git diff --staged --quiet && echo "appcast unchanged" && exit 0
           git commit -m "chore: update appcast-feishu.xml for ${GITHUB_REF_NAME}"
           git push origin main
 
-      - name: Create GitHub Release
+      - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -95,8 +94,16 @@ jobs:
           else
             NOTES_ARG=(--generate-notes)
           fi
-          gh release create "$GITHUB_REF_NAME" \
-            --title "Open Island Feishu ${GITHUB_REF_NAME}" \
-            "${NOTES_ARG[@]}" \
-            "output/package/Open Island Feishu.dmg#Open Island Feishu.dmg (macOS Universal)" \
+          assets=(
+            "output/package/Open Island Feishu.dmg#Open Island Feishu.dmg (macOS Universal)"
             "output/package/Open.Island.Feishu.zip#Open.Island.Feishu.zip (macOS Universal)"
+          )
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} already exists — uploading assets"
+            gh release upload "$GITHUB_REF_NAME" "${assets[@]}" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "Open Island Feishu ${GITHUB_REF_NAME}" \
+              "${NOTES_ARG[@]}" \
+              "${assets[@]}"
+          fi
