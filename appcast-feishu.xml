@@ -7,6 +7,19 @@
         <language>en</language>
         <!-- Items are added by .github/workflows/release-feishu.yml. See docs/feishu-releasing.md. -->
         <item>
+            <title>Version 0.0.5</title>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>0.0.5</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
+            <pubDate>Mon, 29 Jun 2026 07:08:50 +0000</pubDate>
+            <enclosure
+                url="https://github.com/1070124410/open-island-feishu/releases/download/v0.0.5/Open.Island.Feishu.zip"
+                type="application/octet-stream"
+                sparkle:edSignature="gsljWI1Mz2gvuR1F3oZyVLPwquq3Rs7KHj0ICb1+8IIg1Lt2sGlyEdX6e3iy6iuj5SRQiX3Yth2QfsqKF1PDBg=="
+                length="12533311"
+            />
+        </item>
+        <item>
             <title>Version 0.0.4</title>
             <sparkle:version>4</sparkle:version>
             <sparkle:shortVersionString>0.0.4</sparkle:shortVersionString>
