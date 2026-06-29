@@ -7,6 +7,7 @@ struct IslandPetView: View {
     let emoji: String
     let customImagePath: String
     var textScrolling: Bool = false
+    var textScrollDirection: IslandPetTextScrollDirection = .leftToRight
     var textVisibleLength: Int = Self.defaultTextVisibleLength
     let activityMode: UnifiedBars.Mode
     let size: CGFloat
@@ -52,14 +53,20 @@ struct IslandPetView: View {
     }
 
     private var contentIdentity: String {
-        "\(kind.rawValue)-\(emoji)-\(textScrolling)-\(textVisibleLength)-\(customImagePath)"
+        "\(kind.rawValue)-\(emoji)-\(textScrolling)-\(textScrollDirection.rawValue)-\(textVisibleLength)-\(customImagePath)"
     }
 
     @ViewBuilder
     private var textContent: some View {
         let width = Self.textSlotWidth(height: size, visibleLength: textVisibleLength)
         if textScrolling {
-            IslandMarqueeText(text: displayText, fontSize: textFontSize, frameWidth: width, frameHeight: size)
+            IslandMarqueeText(
+                text: displayText,
+                fontSize: textFontSize,
+                frameWidth: width,
+                frameHeight: size,
+                direction: textScrollDirection
+            )
         } else {
             Text(displayText)
                 .font(.system(size: textFontSize))
@@ -138,12 +145,13 @@ struct IslandPetView: View {
     }
 }
 
-/// Horizontal marquee: one-way left-to-right loop (reset and repeat, no bounce).
+/// Horizontal marquee: one-way loop (reset and repeat, no bounce).
 private struct IslandMarqueeText: View {
     let text: String
     let fontSize: CGFloat
     let frameWidth: CGFloat
     let frameHeight: CGFloat
+    var direction: IslandPetTextScrollDirection = .leftToRight
 
     @State private var textWidth: CGFloat = 0
     @State private var scrollOffset: CGFloat = 0
@@ -170,6 +178,7 @@ private struct IslandMarqueeText: View {
         .onAppear { restartMarquee() }
         .onChange(of: text) { _, _ in restartMarquee() }
         .onChange(of: textWidth) { _, _ in restartMarquee() }
+        .onChange(of: direction) { _, _ in restartMarquee() }
     }
 
     private func updateTextWidth(_ width: CGFloat) {
@@ -177,15 +186,27 @@ private struct IslandMarqueeText: View {
         textWidth = width
     }
 
-    /// Text enters from the left edge and exits right; then loops from the start.
+    private var startOffset: CGFloat {
+        switch direction {
+        case .leftToRight: -textWidth
+        case .rightToLeft: frameWidth
+        }
+    }
+
+    private var endOffset: CGFloat {
+        switch direction {
+        case .leftToRight: frameWidth
+        case .rightToLeft: -textWidth
+        }
+    }
+
     private func restartMarquee() {
         marqueeGeneration &+= 1
         let generation = marqueeGeneration
-        scrollOffset = -textWidth
+        scrollOffset = startOffset
 
         guard textWidth > 0 else { return }
 
-        let endOffset = frameWidth
         let duration = max(2.0, Double(textWidth + frameWidth) * 0.055)
 
         DispatchQueue.main.async {
@@ -195,7 +216,7 @@ private struct IslandMarqueeText: View {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + duration) {
                 guard generation == marqueeGeneration else { return }
-                scrollOffset = -textWidth
+                scrollOffset = startOffset
                 restartMarquee()
             }
         }

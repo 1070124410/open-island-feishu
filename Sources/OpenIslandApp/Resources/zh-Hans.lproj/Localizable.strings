@@ -77,6 +77,9 @@
 "settings.appearance.pet.textPlaceholder" = "emoji 或短文本";
 "settings.appearance.pet.emojiPlaceholder" = "emoji 或短文本";
 "settings.appearance.pet.textScroll" = "滚动播放";
+"settings.appearance.pet.textScrollDirection" = "滚动方向";
+"settings.appearance.pet.textScrollDirection.leftToRight" = "从左到右";
+"settings.appearance.pet.textScrollDirection.rightToLeft" = "从右到左";
 "settings.appearance.pet.textVisibleLength" = "展示宽度";
 "settings.appearance.pet.textVisibleLengthValue" = "%d 字";
 "settings.appearance.pet.customPath" = "图片文件";

@@ -295,6 +295,7 @@ struct AppearanceSettingsPane: View {
                     emoji: editingPreferences.petEmoji,
                     customImagePath: editingPreferences.petCustomImagePath,
                     textScrolling: editingPreferences.petTextScrolling,
+                    textScrollDirection: editingPreferences.petTextScrollDirection,
                     textVisibleLength: editingPreferences.petTextVisibleLength,
                     activityMode: previewMode,
                     size: 22
@@ -366,6 +367,7 @@ struct AppearanceSettingsPane: View {
                     emoji: editingPreferences.petEmoji,
                     customImagePath: editingPreferences.petCustomImagePath,
                     textScrolling: editingPreferences.petTextScrolling,
+                    textScrollDirection: editingPreferences.petTextScrollDirection,
                     textVisibleLength: editingPreferences.petTextVisibleLength,
                     activityMode: previewMode,
                     size: 22
@@ -425,6 +427,22 @@ struct AppearanceSettingsPane: View {
                     .foregroundStyle(V6Palette.paper.opacity(0.72))
             }
             .toggleStyle(.switch)
+
+            if editingPreferences.petTextScrolling {
+                HStack(spacing: 12) {
+                    Text(lang.t("settings.appearance.pet.textScrollDirection"))
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundStyle(V6Palette.paper.opacity(0.62))
+                    Picker("", selection: petTextScrollDirectionBinding) {
+                        ForEach(IslandPetTextScrollDirection.allCases) { direction in
+                            Text(petTextScrollDirectionLabel(direction))
+                                .tag(direction)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                }
+            }
         }
 
         if editingPreferences.petKind == .custom {
@@ -530,6 +548,28 @@ struct AppearanceSettingsPane: View {
         .background(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(Color.white.opacity(0.04))
+        )
+    }
+
+    private func petTextScrollDirectionLabel(_ direction: IslandPetTextScrollDirection) -> String {
+        switch direction {
+        case .leftToRight:
+            return lang.t("settings.appearance.pet.textScrollDirection.leftToRight")
+        case .rightToLeft:
+            return lang.t("settings.appearance.pet.textScrollDirection.rightToLeft")
+        }
+    }
+
+    private var petTextScrollDirectionBinding: Binding<IslandPetTextScrollDirection> {
+        Binding(
+            get: { editingPreferences.petTextScrollDirection },
+            set: { direction in
+                model.updateAppearancePreferences(for: editingProfile) { prefs in
+                    prefs.petTextScrollDirection = direction
+                    prefs.petKind = .emoji
+                    prefs.closedLeading = .pet
+                }
+            }
         )
     }
 
@@ -1029,6 +1069,7 @@ struct AppearanceSettingsPane: View {
                 emoji: editingPreferences.petEmoji,
                 customImagePath: editingPreferences.petCustomImagePath,
                 textScrolling: editingPreferences.petTextScrolling,
+                textScrollDirection: editingPreferences.petTextScrollDirection,
                 textVisibleLength: editingPreferences.petTextVisibleLength,
                 activityMode: previewMode
             )

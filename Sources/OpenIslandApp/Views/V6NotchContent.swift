@@ -30,7 +30,7 @@ enum IslandRightSlotContent: Equatable {
 /// Left-slot payload for the closed island pill.
 enum IslandClosedLeadingContent: Equatable, Hashable {
     case activityBars(UnifiedBars.Mode)
-    case pet(IslandPetKind, emoji: String, customImagePath: String, textScrolling: Bool, textVisibleLength: Int, activityMode: UnifiedBars.Mode)
+    case pet(IslandPetKind, emoji: String, customImagePath: String, textScrolling: Bool, textScrollDirection: IslandPetTextScrollDirection, textVisibleLength: Int, activityMode: UnifiedBars.Mode)
     case summary(String)
 }
 
@@ -234,12 +234,13 @@ struct V6ClosedLeadingView: View {
         case .activityBars(let mode):
             UnifiedBars(mode: mode, size: size)
                 .frame(width: size, height: size)
-        case .pet(let kind, let emoji, let customPath, let textScrolling, let textVisibleLength, let mode):
+        case .pet(let kind, let emoji, let customPath, let textScrolling, let textScrollDirection, let textVisibleLength, let mode):
             IslandPetView(
                 kind: kind,
                 emoji: emoji,
                 customImagePath: customPath,
                 textScrolling: textScrolling,
+                textScrollDirection: textScrollDirection,
                 textVisibleLength: textVisibleLength,
                 activityMode: mode,
                 size: size
@@ -257,7 +258,7 @@ struct V6ClosedLeadingView: View {
         switch content {
         case .activityBars:
             return size
-        case .pet(let kind, _, _, _, let textVisibleLength, _):
+        case .pet(let kind, _, _, _, _, let textVisibleLength, _):
             return IslandPetView.intrinsicWidth(size: size, kind: kind, textVisibleLength: textVisibleLength)
         case .summary(let text):
             return V6CenterLabelView.intrinsicWidth(of: text) * 0.92

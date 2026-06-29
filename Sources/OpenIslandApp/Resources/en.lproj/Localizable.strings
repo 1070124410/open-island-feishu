@@ -77,6 +77,9 @@
 "settings.appearance.pet.textPlaceholder" = "Emoji or short text";
 "settings.appearance.pet.emojiPlaceholder" = "Emoji or short text";
 "settings.appearance.pet.textScroll" = "Scroll text";
+"settings.appearance.pet.textScrollDirection" = "Scroll direction";
+"settings.appearance.pet.textScrollDirection.leftToRight" = "Left → right";
+"settings.appearance.pet.textScrollDirection.rightToLeft" = "Right → left";
 "settings.appearance.pet.textVisibleLength" = "Visible width";
 "settings.appearance.pet.textVisibleLengthValue" = "%d chars";
 "settings.appearance.pet.customPath" = "Image file";

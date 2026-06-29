@@ -430,6 +430,7 @@ final class AppModel {
             || oldValue.petKind != newValue.petKind
             || oldValue.petEmoji != newValue.petEmoji
             || oldValue.petTextScrolling != newValue.petTextScrolling
+            || oldValue.petTextScrollDirection != newValue.petTextScrollDirection
             || oldValue.petTextVisibleLength != newValue.petTextVisibleLength
             || oldValue.petCustomImagePath != newValue.petCustomImagePath
             || oldValue.rightSlot != newValue.rightSlot
@@ -473,6 +474,7 @@ final class AppModel {
         defaults.set(preferences.petKind.rawValue, forKey: Self.appearanceDefaultsKey(profile, "petKind"))
         defaults.set(preferences.petEmoji, forKey: Self.appearanceDefaultsKey(profile, "petEmoji"))
         defaults.set(preferences.petTextScrolling, forKey: Self.appearanceDefaultsKey(profile, "petTextScrolling"))
+        defaults.set(preferences.petTextScrollDirection.rawValue, forKey: Self.appearanceDefaultsKey(profile, "petTextScrollDirection"))
         defaults.set(preferences.petTextVisibleLength, forKey: Self.appearanceDefaultsKey(profile, "petTextVisibleLength"))
         defaults.set(preferences.petCustomImagePath, forKey: Self.appearanceDefaultsKey(profile, "petCustomImagePath"))
         defaults.set(preferences.rightSlot.rawValue, forKey: Self.appearanceDefaultsKey(profile, "rightSlot"))
@@ -603,6 +605,9 @@ final class AppModel {
             ) ?? .scout,
             petEmoji: defaults.string(forKey: appearanceDefaultsKey(profile, "petEmoji")) ?? "🐾",
             petTextScrolling: defaults.object(forKey: appearanceDefaultsKey(profile, "petTextScrolling")) as? Bool ?? false,
+            petTextScrollDirection: IslandPetTextScrollDirection(
+                rawValue: defaults.string(forKey: appearanceDefaultsKey(profile, "petTextScrollDirection")) ?? ""
+            ) ?? .leftToRight,
             petTextVisibleLength: IslandPetView.clampedTextVisibleLength(
                 defaults.integer(forKey: appearanceDefaultsKey(profile, "petTextVisibleLength"))
             ),
@@ -996,6 +1001,7 @@ final class AppModel {
                 emoji: prefs.petEmoji,
                 customImagePath: prefs.petCustomImagePath,
                 textScrolling: prefs.petTextScrolling,
+                textScrollDirection: prefs.petTextScrollDirection,
                 textVisibleLength: prefs.petTextVisibleLength,
                 activityMode: mode
             )

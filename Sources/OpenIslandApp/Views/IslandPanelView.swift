@@ -383,6 +383,7 @@ struct IslandPanelView: View {
                         emoji: prefs.petEmoji,
                         customImagePath: prefs.petCustomImagePath,
                         textScrolling: prefs.petTextScrolling,
+                        textScrollDirection: prefs.petTextScrollDirection,
                         textVisibleLength: prefs.petTextVisibleLength,
                         activityMode: model.islandClosedMode,
                         size: 18

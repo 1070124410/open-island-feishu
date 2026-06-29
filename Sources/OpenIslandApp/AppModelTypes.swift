@@ -53,6 +53,14 @@ enum IslandPetKind: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 }
 
+/// Horizontal scroll direction for the custom text slot marquee.
+enum IslandPetTextScrollDirection: String, CaseIterable, Identifiable, Sendable {
+    case leftToRight
+    case rightToLeft
+
+    var id: String { rawValue }
+}
+
 /// What the closed island renders in the center label (external displays
 /// only — on MacBook the physical notch covers this space so we suppress
 /// the label regardless).
@@ -79,6 +87,7 @@ struct IslandAppearancePreferences: Equatable, Sendable {
     var petKind: IslandPetKind = .scout
     var petEmoji: String = "🐾"
     var petTextScrolling: Bool = false
+    var petTextScrollDirection: IslandPetTextScrollDirection = .leftToRight
     /// Visible character slots for the custom text field on the closed island (2…12).
     var petTextVisibleLength: Int = 5
     var petCustomImagePath: String = ""
