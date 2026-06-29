@@ -862,7 +862,7 @@ final class AppModel {
     }
 
     var liveRunningCount: Int {
-        surfacedSessions.filter { $0.phase == .running }.count
+        surfacedSessions.reduce(0) { $0 + $1.islandRunningAgentUnits }
     }
 
     private func sortIslandSessions(_ sessions: [AgentSession]) -> [AgentSession] {
@@ -943,7 +943,7 @@ final class AppModel {
 
         let threshold = completedStaleThreshold.seconds
         let waiting = sessions.filter(\.phase.requiresAttention).count
-        let running = sessions.filter { $0.phase == .running }.count
+        let running = sessions.reduce(0) { $0 + $1.islandRunningAgentUnits }
         let done = sessions.filter {
             $0.phase == .completed
                 && !$0.isStaleCompletedForIsland(at: referenceDate, threshold: threshold)
@@ -1066,7 +1066,8 @@ final class AppModel {
         case .none:
             return nil
         case .count:
-            let n = sessions.count
+            let runningUnits = sessions.reduce(0) { $0 + $1.islandRunningAgentUnits }
+            let n = runningUnits > 0 ? runningUnits : sessions.count
             guard n > 0 else { return nil }
             return .count(n)
         case .agents:
@@ -1084,12 +1085,13 @@ final class AppModel {
                 if ta != tb { return ta < tb }
                 return a.id < b.id
             }
+            let expandedCells = ordered.flatMap(Self.agentsGridCells(for:))
             var cells: [AgentGridCell] = []
-            if ordered.count <= 9 {
-                cells = ordered.map(Self.agentsGridCell(for:))
+            if expandedCells.count <= 9 {
+                cells = expandedCells
             } else {
-                cells = ordered.prefix(7).map(Self.agentsGridCell(for:))
-                cells.append(.overflow(ordered.count - 7))
+                cells = Array(expandedCells.prefix(7))
+                cells.append(.overflow(expandedCells.count - 7))
             }
             return cells.isEmpty ? nil : .agents(cells)
         case .summary:
@@ -1132,6 +1134,17 @@ final class AppModel {
         _agentsGridObservedSequence = _agentsGridObservedSequence.filter {
             retainedIDs.contains($0.key)
         }
+    }
+
+    private static func agentsGridCells(for session: AgentSession) -> [AgentGridCell] {
+        let color = Color(hex: session.tool.brandColorHex) ?? .gray
+        let runningSubagents = session.activeRunningSubagents
+        if !runningSubagents.isEmpty {
+            return runningSubagents.map { _ in
+                .session(color: color, state: .running)
+            }
+        }
+        return [agentsGridCell(for: session)]
     }
 
     private static func agentsGridCell(for session: AgentSession) -> AgentGridCell {

@@ -185,6 +185,24 @@ extension AgentSession {
         return WorkspaceNameResolver.worktreeBranch(for: workingDirectory)
     }
 
+    /// Subagents still executing (no completion summary yet).
+    var activeRunningSubagents: [ClaudeSubagentInfo] {
+        claudeMetadata?.activeSubagents.filter { $0.summary == nil } ?? []
+    }
+
+    /// Running work units for closed-island counts. Each active subagent is one
+    /// unit; sessions without subagents contribute one while running or waiting.
+    var islandRunningAgentUnits: Int {
+        let runningSubagents = activeRunningSubagents
+        if !runningSubagents.isEmpty {
+            return runningSubagents.count
+        }
+        if phase == .running || phase.requiresAttention {
+            return 1
+        }
+        return 0
+    }
+
     var spotlightSubagentLabel: String? {
         guard let subagents = claudeMetadata?.activeSubagents, !subagents.isEmpty else {
             return nil

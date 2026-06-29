@@ -175,6 +175,76 @@ struct AgentsGridRightSlotTests {
         #expect(s2 == .idle)
     }
 
+    /// Active subagents expand into one grid cell each instead of collapsing
+    /// the parent session into a single tile.
+    @Test
+    func activeSubagentsExpandIntoMultipleGridCells() {
+        let model = AppModel()
+        model.islandRightSlot = .agents
+        let now = Date(timeIntervalSince1970: 400_000)
+
+        var parent = makeSession(id: "parent", firstSeenAt: now, updatedAt: now, phase: .running)
+        parent.claudeMetadata = ClaudeSessionMetadata(
+            activeSubagents: [
+                ClaudeSubagentInfo(agentID: "a1", agentType: "general-purpose", startedAt: now),
+                ClaudeSubagentInfo(agentID: "a2", agentType: "general-purpose", startedAt: now),
+                ClaudeSubagentInfo(agentID: "a3", agentType: "general-purpose", startedAt: now),
+                ClaudeSubagentInfo(agentID: "a4", agentType: "general-purpose", startedAt: now),
+                ClaudeSubagentInfo(agentID: "a5", agentType: "general-purpose", startedAt: now),
+            ]
+        )
+        let codex = makeSession(
+            id: "codex",
+            firstSeenAt: now.addingTimeInterval(10),
+            updatedAt: now.addingTimeInterval(10),
+            phase: .running,
+            tool: .codex
+        )
+
+        model.state = SessionState(sessions: [parent, codex])
+
+        guard case let .agents(cells)? = model.islandClosedRightSlotContent() else {
+            Issue.record("Expected .agents right-slot content")
+            return
+        }
+        #expect(cells.count == 6)
+    }
+
+    /// Count mode prefers live running units (including subagents) over session total.
+    @Test
+    func countModeUsesRunningSubagentUnits() {
+        let model = AppModel()
+        model.islandRightSlot = .count
+        let now = Date(timeIntervalSince1970: 500_000)
+
+        var parent = makeSession(id: "parent", firstSeenAt: now, updatedAt: now, phase: .running)
+        parent.claudeMetadata = ClaudeSessionMetadata(
+            activeSubagents: (0..<5).map {
+                ClaudeSubagentInfo(agentID: "a\($0)", agentType: "general-purpose", startedAt: now)
+            }
+        )
+        let codex = makeSession(
+            id: "codex",
+            firstSeenAt: now.addingTimeInterval(10),
+            updatedAt: now.addingTimeInterval(10),
+            phase: .running
+        )
+        let idle = makeSession(
+            id: "idle",
+            firstSeenAt: now.addingTimeInterval(20),
+            updatedAt: now.addingTimeInterval(20),
+            phase: .completed
+        )
+
+        model.state = SessionState(sessions: [parent, codex, idle])
+
+        guard case let .count(n)? = model.islandClosedRightSlotContent() else {
+            Issue.record("Expected .count right-slot content")
+            return
+        }
+        #expect(n == 6)
+    }
+
     // MARK: - helpers
 
     private static func cellFor(_ session: AgentSession) -> AgentGridCell {
@@ -195,12 +265,13 @@ struct AgentsGridRightSlotTests {
         firstSeenAt: Date,
         updatedAt: Date,
         phase: SessionPhase = .running,
+        tool: AgentTool = .claudeCode,
         permissionRequest: PermissionRequest? = nil
     ) -> AgentSession {
         var session = AgentSession(
             id: id,
-            title: "Claude · \(id)",
-            tool: .claudeCode,
+            title: "\(tool.displayName) · \(id)",
+            tool: tool,
             origin: .live,
             attachmentState: .attached,
             phase: phase,

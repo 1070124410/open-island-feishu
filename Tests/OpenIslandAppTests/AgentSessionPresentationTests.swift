@@ -333,4 +333,53 @@ struct AgentSessionPresentationTests {
         #expect(session.spotlightSecondaryText == "Running Search")
         #expect(session.displayCurrentToolName == "Search")
     }
+
+    @Test
+    func runningSubagentsContributeMultipleIslandUnits() {
+        let session = AgentSession(
+            id: "parent",
+            title: "Claude · parent",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Running subagents",
+            updatedAt: .now,
+            claudeMetadata: ClaudeSessionMetadata(
+                activeSubagents: [
+                    ClaudeSubagentInfo(agentID: "a1", agentType: "general-purpose", startedAt: .now),
+                    ClaudeSubagentInfo(agentID: "a2", agentType: "general-purpose", startedAt: .now),
+                    ClaudeSubagentInfo(agentID: "a3", agentType: "general-purpose", startedAt: .now),
+                    ClaudeSubagentInfo(agentID: "a4", agentType: "general-purpose", startedAt: .now),
+                    ClaudeSubagentInfo(agentID: "a5", agentType: "general-purpose", startedAt: .now),
+                ]
+            )
+        )
+
+        #expect(session.activeRunningSubagents.count == 5)
+        #expect(session.islandRunningAgentUnits == 5)
+    }
+
+    @Test
+    func completedSubagentsDoNotCountAsRunningUnits() {
+        let session = AgentSession(
+            id: "parent",
+            title: "Claude · parent",
+            tool: .claudeCode,
+            origin: .live,
+            attachmentState: .attached,
+            phase: .running,
+            summary: "Finishing up",
+            updatedAt: .now,
+            claudeMetadata: ClaudeSessionMetadata(
+                activeSubagents: [
+                    ClaudeSubagentInfo(agentID: "a1", agentType: "general-purpose", summary: "done", startedAt: .now),
+                    ClaudeSubagentInfo(agentID: "a2", agentType: "general-purpose", startedAt: .now),
+                ]
+            )
+        )
+
+        #expect(session.activeRunningSubagents.count == 1)
+        #expect(session.islandRunningAgentUnits == 1)
+    }
 }
