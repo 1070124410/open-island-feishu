@@ -15,21 +15,8 @@
             <enclosure
                 url="https://github.com/1070124410/open-island-feishu/releases/download/v0.0.7/Open.Island.Feishu.zip"
                 type="application/octet-stream"
-                sparkle:edSignature="3ku4HS1EoU7Uqu9R0ZiLkHcjrHSLxH85JP5owPA2rV3bOJAT6Cu1UpszIv0EYgZTIcY2TUXYuT8kvN79hLgSBg=="
-                length="12537345"
-            />
-        </item>
-        <item>
-            <title>Version 0.0.7</title>
-            <sparkle:version>926</sparkle:version>
-            <sparkle:shortVersionString>0.0.7</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-            <pubDate>Mon, 29 Jun 2026 09:09:59 +0000</pubDate>
-            <enclosure
-                url="https://github.com/1070124410/open-island-feishu/releases/download/v0.0.7/Open.Island.Feishu.zip"
-                type="application/octet-stream"
-                sparkle:edSignature="wGHOirw0WZ9kQ/nLG/64bxJ7QnuCQJz3Fa8nXAb2EGkAPz9mqe2YfPHQX44CzEa62nEpKn7H/t/jrPFkts4LBQ=="
-                length="28894293"
+                sparkle:edSignature="L0y414FSrsqOaAVUP/N1nYB2Dm1MvSWkeUzdI1CR3ytubrIYWKWOcY75NmzTa6Fq32xAKqAq/eXocWsPqtkJBw=="
+                length="28894290"
             />
         </item>
         <item>
