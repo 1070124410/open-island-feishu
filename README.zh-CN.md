@@ -107,12 +107,16 @@ cp -R "output/package/Open Island Feishu.app" /Applications/
 
 ### 2. 安装飞书 sidecar
 
-```bash
-git clone https://github.com/1070124410/vibe-island-feishu.git ~/open-island-feishu
-cd ~/open-island-feishu && ./scripts/install.sh
-```
+1. 到 [Releases](https://github.com/1070124410/open-island-feishu/releases/latest) 下载对应你机器的 tarball：
+   - Apple Silicon（M1/M2/M3/M4）→ `open-island-feishu-darwin-arm64.tar.gz`
+   - Intel Mac → `open-island-feishu-darwin-amd64.tar.gz`
+2. 双击 `.tar.gz` 解压（macOS 自带解压）。
+3. 进入解压出来的文件夹，**右键点击 `Install.command` → 打开**（首次必须右键打开一次，否则 macOS Gatekeeper 会拒绝；以后双击就行）。
+4. 弹出的 Terminal 窗口跑完后会提示 `✅ 安装完成`，按任意键关闭。
 
-守护进程 launchd 标识 `app.openisland.feishu`，管理 API 默认 `http://127.0.0.1:8742`。
+`Install.command` 内部就是 `scripts/install.sh`：剥离 `com.apple.quarantine` → ad-hoc 签名所有二进制 → 装到 `~/.local/bin` → 镜像一份到 `~/open-island-feishu/`（让 Open Island 的"安装本地飞书插件"按钮以后能复用）→ 加载 launchd 守护进程 `app.openisland.feishu`（管理 API 默认 `http://127.0.0.1:8742`）。
+
+> 想用命令行？进入解压目录直接跑 `./scripts/install.sh` 即可。
 
 ### 3. 在应用内一次性配置
 

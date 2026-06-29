@@ -109,12 +109,16 @@ cp -R "output/package/Open Island Feishu.app" /Applications/
 
 ### 2. Install the Feishu sidecar
 
-```bash
-git clone https://github.com/1070124410/vibe-island-feishu.git ~/open-island-feishu
-cd ~/open-island-feishu && ./scripts/install.sh
-```
+1. From [Releases](https://github.com/1070124410/open-island-feishu/releases/latest), download the tarball for your Mac:
+   - Apple Silicon (M1/M2/M3/M4) → `open-island-feishu-darwin-arm64.tar.gz`
+   - Intel Mac → `open-island-feishu-darwin-amd64.tar.gz`
+2. Double-click the `.tar.gz` to unpack.
+3. Open the unpacked folder, **right-click `Install.command` → Open** (first launch must be right-click → Open so Gatekeeper lets it through; subsequent launches can double-click).
+4. The Terminal window will print `✅ Install complete` when finished.
 
-Sidecar runs as launchd job `app.openisland.feishu`, admin API `http://127.0.0.1:8742`.
+`Install.command` runs `scripts/install.sh` internally, which strips `com.apple.quarantine`, ad-hoc signs the bundled binaries, installs them to `~/.local/bin`, mirrors the repo to `~/open-island-feishu/` (so the in-app "Install local Feishu plugin" button can re-run it), and loads the launchd job `app.openisland.feishu` (admin API `http://127.0.0.1:8742`).
+
+> Prefer the command line? `cd` into the unpacked folder and run `./scripts/install.sh` directly.
 
 ### 3. Configure once in the app
 
