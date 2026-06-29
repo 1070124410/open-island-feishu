@@ -120,8 +120,21 @@ EOF
 
 plutil -lint "$bundle_dir/Contents/Info.plist" >/dev/null
 
-# 飞书定制版默认禁用 Sparkle 官方源，避免提示升级到 upstream 并覆盖集成。
-if [[ "$bundle_identifier" == "app.openisland.feishu" || "$version" == *"-feishu"* ]] && [[ -z "${OPEN_ISLAND_APPCAST_URL:-}" ]]; then
+# Feishu fork: dedicated Sparkle appcast on GitHub (never upstream Open Island feed).
+if [[ "$bundle_identifier" == "app.openisland.feishu" ]]; then
+    feishu_appcast="${OPEN_ISLAND_APPCAST_URL:-https://raw.githubusercontent.com/1070124410/open-island-feishu/main/appcast-feishu.xml}"
+    feishu_public_key_file="$repo_root/config/sparkle/feishu-public-ed-key.txt"
+    if [[ -z "${OPEN_ISLAND_EDDSA_PUBLIC_KEY:-}" && -f "$feishu_public_key_file" ]]; then
+        OPEN_ISLAND_EDDSA_PUBLIC_KEY="$(tr -d '[:space:]' < "$feishu_public_key_file")"
+    fi
+    /usr/libexec/PlistBuddy -c "Set :SUFeedURL ${feishu_appcast}" "$bundle_dir/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool true" "$bundle_dir/Contents/Info.plist" 2>/dev/null \
+        || /usr/libexec/PlistBuddy -c "Set :SUEnableAutomaticChecks true" "$bundle_dir/Contents/Info.plist"
+    if [[ -n "${OPEN_ISLAND_EDDSA_PUBLIC_KEY:-}" ]]; then
+        /usr/libexec/PlistBuddy -c "Set :SUPublicEDKey ${OPEN_ISLAND_EDDSA_PUBLIC_KEY}" "$bundle_dir/Contents/Info.plist"
+    fi
+    echo "Feishu build: Sparkle feed -> ${feishu_appcast}"
+elif [[ "$version" == *"-feishu"* && -z "${OPEN_ISLAND_APPCAST_URL:-}" ]]; then
     /usr/libexec/PlistBuddy -c "Delete :SUFeedURL" "$bundle_dir/Contents/Info.plist" 2>/dev/null || true
     /usr/libexec/PlistBuddy -c "Add :SUEnableAutomaticChecks bool false" "$bundle_dir/Contents/Info.plist" 2>/dev/null \
         || /usr/libexec/PlistBuddy -c "Set :SUEnableAutomaticChecks false" "$bundle_dir/Contents/Info.plist"

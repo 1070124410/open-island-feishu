@@ -25,6 +25,12 @@ Sidecar 为独立 MIT 项目；Open Island Feishu 本体为 GPL-3.0。见 [NOTIC
 
 ## 自动更新
 
-**请勿**对本应用使用上游 Open Island 的 Sparkle 更新源——会安装无飞书集成的官方包。
+从 **v0.0.3** 起，正式 Release 内置 Sparkle，更新源为本仓库的 `appcast-feishu.xml`（**不是**上游 Open Island）。
 
-请从 [open-island-feishu Releases](https://github.com/1070124410/open-island-feishu/releases) 获取新版本。打包时会移除 `SUFeedURL` 并关闭 Sparkle 自动检查。
+- 应用内：**设置 → 关于 → 检查更新**
+- 手动下载：[Releases](https://github.com/1070124410/open-island-feishu/releases)
+- 发版说明：[docs/feishu-releasing.md](./feishu-releasing.md)
+
+**请勿**使用上游 Open Island 的 Sparkle 更新——会覆盖为无飞书集成的官方包。
+
+Release 包为 **Universal 二进制**（Intel + Apple Silicon）。v0.0.2 及更早版本需手动安装一次 v0.0.3+ 后才能使用应用内更新。

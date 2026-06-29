@@ -86,7 +86,7 @@ So you can keep official **Open Island** installed for comparison or daily drive
 | Bundle ID | `app.openisland.dev` | **`app.openisland.feishu`** |
 | App Support | `~/Library/Application Support/OpenIsland/` | **`~/Library/Application Support/OpenIslandFeishu/`** |
 | Feishu integration | — | **built-in** |
-| Sparkle updates | upstream appcast | **disabled** (upstream update would remove Feishu) |
+| Sparkle updates | upstream appcast | **this repo's appcast** (not upstream) |
 
 ---
 
@@ -142,15 +142,17 @@ We do **not** duplicate that full matrix here — see upstream docs for agent/te
 ## Build & release
 
 ```bash
-OPEN_ISLAND_VERSION=0.0.1 zsh scripts/package-feishu-app.sh
+OPEN_ISLAND_VERSION=0.0.3 OPEN_ISLAND_UNIVERSAL=true zsh scripts/package-feishu-app.sh
 ```
 
 Artifacts under `output/package/`:
 
-- `Open Island Feishu.app`
+- `Open Island Feishu.app` — **Universal** (Intel + Apple Silicon)
 - `Open Island Feishu.dmg` / `.zip`
 
-> **Updates:** install only from [this repo's Releases](https://github.com/1070124410/open-island-feishu/releases). Do not use upstream Open Island Sparkle — it replaces the app with a build that has no Feishu tab.
+**In-app updates (v0.0.3+):** Settings → About → Check for Updates. Sparkle pulls [appcast-feishu.xml](https://raw.githubusercontent.com/1070124410/open-island-feishu/main/appcast-feishu.xml) after each [GitHub Release](https://github.com/1070124410/open-island-feishu/releases). Maintainer flow: [docs/feishu-releasing.md](./docs/feishu-releasing.md).
+
+> Do **not** use upstream Open Island's Sparkle feed — it installs a build without the Feishu tab.
 
 ---
 

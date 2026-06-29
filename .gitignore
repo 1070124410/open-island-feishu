@@ -20,6 +20,7 @@ Package.resolved
 .claude/
 .playwright-mcp/
 output/
+config/sparkle/feishu-ed-private.key
 
 # Logs and temp files
 *.log

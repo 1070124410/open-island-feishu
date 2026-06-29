@@ -361,9 +361,13 @@ struct AboutSettingsPane: View {
             Form {
                 Section {
                     if model.updateChecker.updatesDisabled {
-                        Text(lang.t("settings.about.feishuUpdateDisabled"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text(lang.t("settings.about.updatesManualHint"))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Link(lang.t("settings.about.viewReleases"), destination: UpdateChecker.releasesURL)
+                                .font(.caption)
+                        }
                     } else {
                         aboutActionRow(
                             title: lang.t("settings.about.checkForUpdates"),

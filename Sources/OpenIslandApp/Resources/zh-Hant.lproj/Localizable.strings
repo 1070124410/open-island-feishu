@@ -201,6 +201,8 @@
 /* Settings - About */
 "settings.about.version" = "版本 %@";
 "settings.about.checkForUpdates" = "檢查更新…";
+"settings.about.updatesManualHint" = "目前建置未設定應用內更新來源，請從 GitHub Releases 下載新版本。";
+"settings.about.viewReleases" = "在 GitHub 查看 Releases";
 "settings.about.quitApp" = "結束 Open Island";
 "island.quit.confirmTitle" = "結束 Open Island？";
 "island.quit.confirmAction" = "結束";

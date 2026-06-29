@@ -26,18 +26,64 @@ jobs:
       - name: Resolve Swift packages
         run: swift package resolve
 
-      - name: Build Open Island Feishu
+      - name: Build Open Island Feishu (Universal)
         env:
           OPEN_ISLAND_VERSION: ${{ steps.version.outputs.version }}
           OPEN_ISLAND_BUILD_NUMBER: ${{ github.run_number }}
+          OPEN_ISLAND_UNIVERSAL: "true"
         run: zsh scripts/package-feishu-app.sh
 
-      - name: Verify artifacts
+      - name: Verify universal binary
         run: |
-          test -f "output/package/Open Island Feishu.zip"
-          test -f "output/package/Open Island Feishu.dmg"
+          binary="output/package/Open Island Feishu.app/Contents/MacOS/OpenIslandApp"
+          lipo -info "$binary" | tee /dev/stderr | grep -q 'arm64'
+          lipo -info "$binary" | grep -q 'x86_64'
           /usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" \
             "output/package/Open Island Feishu.app/Contents/Info.plist" | grep -q 'app.openisland.feishu'
+          /usr/libexec/PlistBuddy -c "Print :SUFeedURL" \
+            "output/package/Open Island Feishu.app/Contents/Info.plist" | grep -q 'appcast-feishu.xml'
+
+      - name: Sign update archive (Sparkle EdDSA)
+        id: sparkle_sign
+        env:
+          SPARKLE_EDDSA_KEY: ${{ secrets.SPARKLE_EDDSA_KEY }}
+        run: |
+          sign_tool=".build/artifacts/sparkle/Sparkle/bin/sign_update"
+          zip_path="output/package/Open.Island.Feishu.zip"
+          if [[ -z "$SPARKLE_EDDSA_KEY" ]]; then
+            echo "::warning::SPARKLE_EDDSA_KEY not set — appcast will not be updated. See config/sparkle/README.md"
+            echo "signed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          sign_output="$(echo "$SPARKLE_EDDSA_KEY" | "$sign_tool" "$zip_path" --ed-key-file -)"
+          ed_signature="$(echo "$sign_output" | sed -n 's/.*sparkle:edSignature="\([^"]*\)".*/\1/p')"
+          length="$(echo "$sign_output" | sed -n 's/.*length="\([^"]*\)".*/\1/p')"
+          echo "ed_signature=$ed_signature" >> "$GITHUB_OUTPUT"
+          echo "length=$length" >> "$GITHUB_OUTPUT"
+          echo "signed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Update appcast-feishu.xml
+        if: steps.sparkle_sign.outputs.signed == 'true'
+        run: |
+          zsh scripts/update-feishu-appcast.sh \
+            "${{ steps.version.outputs.version }}" \
+            "${{ github.run_number }}" \
+            "${{ steps.sparkle_sign.outputs.ed_signature }}" \
+            "${{ steps.sparkle_sign.outputs.length }}"
+
+      - name: Commit appcast to main
+        if: steps.sparkle_sign.outputs.signed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git checkout main
+          git pull --ff-only origin main
+          git checkout "$GITHUB_SHA" -- appcast-feishu.xml
+          git add appcast-feishu.xml
+          git diff --staged --quiet && echo "appcast unchanged" && exit 0
+          git commit -m "chore: update appcast-feishu.xml for ${GITHUB_REF_NAME}"
+          git push origin main
 
       - name: Create GitHub Release
         env:
@@ -52,5 +98,5 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "Open Island Feishu ${GITHUB_REF_NAME}" \
             "${NOTES_ARG[@]}" \
-            "output/package/Open Island Feishu.dmg#Open Island Feishu.dmg (macOS)" \
-            "output/package/Open Island Feishu.zip#Open Island Feishu.zip (macOS)"
+            "output/package/Open Island Feishu.dmg#Open Island Feishu.dmg (macOS Universal)" \
+            "output/package/Open.Island.Feishu.zip#Open.Island.Feishu.zip (macOS Universal)"

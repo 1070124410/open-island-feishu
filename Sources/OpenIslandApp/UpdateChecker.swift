@@ -2,17 +2,15 @@ import Combine
 import Foundation
 import Sparkle
 
-/// Wraps Sparkle's `SPUUpdater` to provide observable update state for SwiftUI.
+/// Wraps Sparkle's `SPUUpdater` for in-app updates.
 ///
-/// Sparkle handles the full lifecycle: checking for updates, downloading,
-/// extracting, replacing the app bundle, and relaunching.
-/// Feishu integration builds skip Sparkle — upstream updates would remove the fork.
+/// Open Island Feishu uses `appcast-feishu.xml` on GitHub (not upstream Open Island).
 @MainActor
 @Observable
 final class UpdateChecker: NSObject {
     static let releasesURL = URL(string: "https://github.com/1070124410/open-island-feishu/releases")!
 
-    /// This fork ships as **Open Island Feishu** with bundle id `app.openisland.feishu`.
+    /// Feishu fork bundle id — used for dock icon and other fork-specific behavior.
     static var isFeishuIntegrationBuild: Bool {
         if Bundle.main.bundleIdentifier == "app.openisland.feishu" {
             return true
@@ -21,6 +19,11 @@ final class UpdateChecker: NSObject {
             return false
         }
         return version.localizedCaseInsensitiveContains("-feishu")
+    }
+
+    /// Sparkle is disabled when the packaged app has no `SUFeedURL` (e.g. dev builds).
+    static var sparkleFeedURL: String? {
+        Bundle.main.object(forInfoDictionaryKey: "SUFeedURL") as? String
     }
 
     private(set) var canCheckForUpdates = false
@@ -36,7 +39,7 @@ final class UpdateChecker: NSObject {
 
     override init() {
         super.init()
-        updatesDisabled = Self.isFeishuIntegrationBuild
+        updatesDisabled = Self.sparkleFeedURL == nil
         updaterController = SPUStandardUpdaterController(
             startingUpdater: false,
             updaterDelegate: self,
@@ -45,10 +48,9 @@ final class UpdateChecker: NSObject {
     }
 
     /// Start Sparkle's automatic update checking schedule.
-    /// Call once after app launch.
     func startIfNeeded() {
         if updatesDisabled {
-            print("[UpdateChecker] skipped — Feishu integration build must not auto-update from upstream appcast")
+            print("[UpdateChecker] skipped — no SUFeedURL in Info.plist")
             return
         }
 
@@ -75,7 +77,6 @@ final class UpdateChecker: NSObject {
         #endif
     }
 
-    /// Manually trigger an update check (from Settings UI).
     func checkForUpdates() {
         guard !updatesDisabled else { return }
         updaterController.checkForUpdates(nil)

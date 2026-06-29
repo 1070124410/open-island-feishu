@@ -203,7 +203,8 @@
 /* Settings - About */
 "settings.about.version" = "Version %@";
 "settings.about.checkForUpdates" = "Check for Updates…";
-"settings.about.feishuUpdateDisabled" = "Feishu build skips upstream Sparkle updates (v1.1.3 would remove the Feishu tab). Reinstall from ~/open-island instead.";
+"settings.about.updatesManualHint" = "This build has no in-app update feed. Download new versions from GitHub Releases.";
+"settings.about.viewReleases" = "View Releases on GitHub";
 "settings.about.quitApp" = "Quit Open Island";
 "island.quit.confirmTitle" = "Quit Open Island?";
 "island.quit.confirmAction" = "Quit";
