@@ -236,18 +236,66 @@ else
     codesign --force --sign - "$bundle_dir" 2>/dev/null || true
 fi
 
-ditto -c -k --keepParent "$bundle_dir" "$zip_path"
+# --- Staging dir: feishu builds bundle a Fix-Launch.command beside the .app so
+#     end-users who receive the dmg/zip through sandboxed IM clients (Feishu,
+#     WeChat, ...) can repair the com.apple.quarantine + ad-hoc combination
+#     that otherwise causes Gatekeeper to kill the app at launch.
+fix_helper_src="$repo_root/scripts/feishu-fix-launch.command"
+include_fix_helper="false"
+if [[ "$bundle_identifier" == "app.openisland.feishu" && -f "$fix_helper_src" ]]; then
+    include_fix_helper="true"
+fi
+
+stage_dir="$(mktemp -d)/oi-stage"
+mkdir -p "$stage_dir"
+cp -R "$bundle_dir" "$stage_dir/"
+if [[ "$include_fix_helper" == "true" ]]; then
+    cp "$fix_helper_src" "$stage_dir/Fix-Launch.command"
+    chmod +x "$stage_dir/Fix-Launch.command"
+    xattr -c "$stage_dir/Fix-Launch.command" 2>/dev/null || true
+fi
+
+rebuild_zip() {
+    rm -f "$zip_path"
+    if [[ "$include_fix_helper" == "true" ]]; then
+        # ditto without --keepParent so contents (.app + Fix-Launch.command)
+        # land at the root of the extracted folder.
+        ditto -c -k --sequesterRsrc "$stage_dir" "$zip_path"
+    else
+        ditto -c -k --keepParent "$bundle_dir" "$zip_path"
+    fi
+}
+
+rebuild_zip
 
 # --- Notarize app bundle (before DMG so the stapled bundle goes into the DMG) ---
 if [[ -n "$signing_identity" && -n "$notary_profile" ]]; then
     xcrun notarytool submit "$zip_path" --keychain-profile "$notary_profile" --wait
     xcrun stapler staple -v "$bundle_dir"
-    rm -f "$zip_path"
-    ditto -c -k --keepParent "$bundle_dir" "$zip_path"
+    # Re-sync staged app from the stapled original, then rebuild the zip.
+    if [[ "$include_fix_helper" == "true" ]]; then
+        rm -rf "$stage_dir/$(basename "$bundle_dir")"
+        cp -R "$bundle_dir" "$stage_dir/"
+    fi
+    rebuild_zip
 fi
 
 # --- Styled DMG creation ---
 dmg_bg="$repo_root/Assets/Brand/dmg-background@2x.png"
+
+dmg_icon_args=(--icon "$app_name.app" 180 210 --hide-extension "$app_name.app")
+if [[ "$include_fix_helper" == "true" ]]; then
+    dmg_icon_args+=(--icon "Fix-Launch.command" 330 320)
+fi
+
+# When include_fix_helper=true we pass the staging dir as the DMG source so
+# create-dmg lays out both the .app and Fix-Launch.command at the DMG root;
+# otherwise we keep the legacy single-bundle layout used by upstream builds.
+if [[ "$include_fix_helper" == "true" ]]; then
+    dmg_source="$stage_dir"
+else
+    dmg_source="$bundle_dir"
+fi
 
 create-dmg \
     --volname "$app_name" \
@@ -256,12 +304,11 @@ create-dmg \
     --window-size 660 400 \
     --icon-size 96 \
     --text-size 13 \
-    --icon "$app_name.app" 180 210 \
-    --hide-extension "$app_name.app" \
+    "${dmg_icon_args[@]}" \
     --app-drop-link 480 210 \
     --no-internet-enable \
     "$dmg_path" \
-    "$bundle_dir"
+    "$dmg_source"
 
 # Sign the DMG itself (required before notarization)
 if [[ -n "$signing_identity" ]]; then
@@ -289,4 +336,9 @@ fi
 
 if [[ -n "$notary_profile" ]]; then
     echo "Notary profile: $notary_profile"
+fi
+
+# Clean up the staging dir we created beside the .app for zip/dmg layout.
+if [[ -n "${stage_dir:-}" && -d "$stage_dir" ]]; then
+    rm -rf "$(dirname "$stage_dir")"
 fi
