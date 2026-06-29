@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   build-and-release:
-    runs-on: macos-14
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
@@ -18,8 +18,13 @@ jobs:
         id: version
         run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Install icon dependencies
-        run: pip3 install Pillow
+      - name: Install dependencies
+        run: |
+          brew install create-dmg
+          pip3 install --break-system-packages Pillow
+
+      - name: Resolve Swift packages
+        run: swift package resolve
 
       - name: Build Open Island Feishu
         env:
@@ -45,7 +50,7 @@ jobs:
             NOTES_ARG=(--generate-notes)
           fi
           gh release create "$GITHUB_REF_NAME" \
-            --title "Open Island Feishu ${GITHUB_REF_NAME#v}" \
+            --title "Open Island Feishu ${GITHUB_REF_NAME}" \
             "${NOTES_ARG[@]}" \
             "output/package/Open Island Feishu.dmg#Open Island Feishu.dmg (macOS)" \
             "output/package/Open Island Feishu.zip#Open Island Feishu.zip (macOS)"
